@@ -33,7 +33,7 @@ const DEFAULTS = {
   musicGlow: 'adaptive', // running light around the island while music plays: adaptive | rainbow | white | off
   speed: 'fast', volumeBar: true, showBattery: true, batteryWarning: true, privacyDot: true,
   weatherCity: '', calendarUrl: '',
-  startWithWindows: false,
+  startWithWindows: true, // starts with Windows and shows in Windows' Startup apps list
   testMode: false,
   // system stats: which ones, and where (the resting notch and/or the open island)
   stats: { cpu: true, ram: true, gpu: true }, statsRest: true, statsOpen: true,
@@ -59,6 +59,8 @@ const merge = (base, p) => ({
 function load(dir) {
   file = path.join(dir, 'settings.json')
   try { current = merge(DEFAULTS, JSON.parse(fs.readFileSync(file, 'utf8'))) } catch {}
+  // one-time switch-on for people whose settings were saved while the default was still "off"
+  if (!current.autostartSet) { current = { ...current, startWithWindows: true, autostartSet: true }; save() }
 }
 function save() {
   try { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, JSON.stringify(current, null, 2)) } catch (e) { console.log('[settings]', e.message) }

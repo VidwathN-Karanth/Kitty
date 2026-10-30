@@ -7,7 +7,7 @@ export const DEFAULT_SETTINGS: Settings = {
   lightPreset: 'classic', lightWork: '#f0a030', lightDone: '#5fe05f', lightError: '#e5483d',
   sounds: true, soundLevel: 'normal', notifications: true, confetti: true, warnAt: 80, usageBudget: 1000000,
   musicGlow: 'adaptive', speed: 'fast', volumeBar: true, showBattery: true, batteryWarning: true, privacyDot: true, weatherCity: '', calendarUrl: '',
-  startWithWindows: false, testMode: false,
+  startWithWindows: true, testMode: false,
   stats: { cpu: true, ram: true, gpu: true }, statsRest: true, statsOpen: true, peekOnQuestion: true,
   shortcuts: { open: 'Ctrl+Alt+T', home: 'Ctrl+Alt+Shift+1', music: 'Ctrl+Alt+Shift+2', claude: 'Ctrl+Alt+Shift+3', focus: 'Ctrl+Alt+Shift+4', clipboard: 'Ctrl+Alt+Shift+5', note: 'Ctrl+Alt+Shift+6' },
   apps: { claude: true, music: true, chat: true, focus: true, tray: true, clipboard: true, note: true, clock: true },

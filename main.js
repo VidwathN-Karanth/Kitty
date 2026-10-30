@@ -116,7 +116,7 @@ function applySettings(s) {
   refreshTray()
   syncGpuHelper(s)
   info.settingsChanged(s)
-  if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: s.startWithWindows })
+  if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: s.startWithWindows, name: 'Kitty' })
   all('settings', s)
   return s
 }
@@ -335,6 +335,8 @@ if (!app.requestSingleInstanceLock()) app.quit() // one Kitty at a time (also ke
 
 app.whenReady().then(() => {
   settings.load(app.getPath('userData'))
+  // register (or unregister) with Windows on every launch, so the Startup apps entry always points at this copy
+  if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: settings.get().startWithWindows, name: 'Kitty' })
   info.start(settings.get(), (i) => all('info', i))
   create()
   makeTray()

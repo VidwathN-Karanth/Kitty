@@ -4,6 +4,7 @@ import { FocusState, fmt } from './Focus'
 import { pickSession } from './useClaude'
 import { when } from './useInfo'
 import type { TabId } from './tabs'
+import Stats from './Stats'
 
 const CLAUDE_STATE: Record<string, [string, string]> = {
   working: ['Working', '#f0a030'], question: ['Needs you', '#f0a030'], error: ['Error', '#e5483d'], done: ['Done', '#5fe05f'], idle: ['Idle', '#8a8a90'],
@@ -12,9 +13,9 @@ const CLAUDE_STATE: Record<string, [string, string]> = {
 // Stop the click on a card's own buttons from also opening the card
 const only = (fn: () => void) => (e: React.MouseEvent) => { e.stopPropagation(); fn() }
 
-export default function Home({ focus, now, media, claude, info, hasCalendar, setFocus, go, connected }: {
+export default function Home({ focus, now, media, claude, info, hasCalendar, setFocus, go, connected, sys, statsOn }: {
   focus: FocusState; now: number; media: Media; claude: ClaudeData; info: Info; hasCalendar: boolean
-  setFocus: (f: FocusState) => void; go: (t: TabId) => void; connected: boolean
+  setFocus: (f: FocusState) => void; go: (t: TabId) => void; connected: boolean; sys: SysStats | null; statsOn: Settings['stats']
 }) {
   const m = media.state
   const session = pickSession(claude.sessions)
@@ -82,9 +83,10 @@ export default function Home({ focus, now, media, claude, info, hasCalendar, set
 
       <div className="strip">
         <span className="chip-w">
-          {w?.temp !== undefined ? <><span className="em">{w.emoji}</span><b>{w.temp}{'°'}</b><span className="dim">{w.text} · {w.city}</span></>
-            : <><CloudOff size={15} /><span className="dim">{w?.error ?? 'Add your city in Settings for the weather'}</span></>}
+          {w?.temp !== undefined ? <><span className="em" title={w.text}>{w.emoji}</span><b>{w.temp}{'°'}</b><span className="dim" title={w.text}>{w.city}</span></>
+            : <><CloudOff size={15} /><span className="dim">{w?.error ?? 'Set your city'}</span></>}
         </span>
+        {sys && <Stats s={sys} on={statsOn} />}
         <span className="chip-e">
           {next ? (
             <>
@@ -92,7 +94,7 @@ export default function Home({ focus, now, media, claude, info, hasCalendar, set
               <span className="ev"><b>{next.title}</b> <span className="dim">{when(next.start, next.end, now)}</span></span>
               {next.link && <button className="join" onClick={() => window.kitty.openUrl(next.link)}><Video size={14} />Join</button>}
             </>
-          ) : <><CalendarClock size={16} /><span className="dim">{hasCalendar ? 'No meetings coming up' : 'Add your calendar in Settings'}</span></>}
+          ) : <><CalendarClock size={16} /><span className="dim">{hasCalendar ? 'No meetings' : 'Add calendar'}</span></>}
         </span>
       </div>
     </div>

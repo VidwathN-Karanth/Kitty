@@ -49,12 +49,14 @@
       "package.json",
       "preload.js",
       "settings.js",
+      "stats.ps1",
       "updater.js",
       "usage.js"
     ],
     "asarUnpack": [
       "bt.ps1",
-      "media.ps1"
+      "media.ps1",
+      "stats.ps1"
     ],
     "win": {
       "target": [

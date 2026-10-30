@@ -11,6 +11,7 @@ import Claude from './Claude'
 import Chat from './Chat'
 import Bars from './Bars'
 import Battery from './Battery'
+import Stats, { statItems } from './Stats'
 import StatusDot from './StatusDot'
 import Confetti from './Confetti'
 import Volume from './Volume'
@@ -85,10 +86,10 @@ export default function App() {
       if (c.notifications) new Notification('Claude Code', { body: `${e.project}: something went wrong` })
     } else {
       if (c.sounds) e.type === 'question' ? sounds.question() : sounds.done()
-      if (c.notifications) new Notification('Claude Code', { body: e.type === 'question' ? `${e.project}: ${e.message ?? 'needs you'}` : `${e.project} is done` })
+      if (c.notifications && e.type === 'question') new Notification('Claude Code', { body: `${e.project}: ${e.message ?? 'needs you'}` })
       if (e.type === 'done' && (e.ms ?? 0) > 10 * 60000) { confetti(); showMood('excited', 4000) } // a long task deserves a party
     }
-    if (!c.apps.claude) return
+    if (e.type !== 'question' || !c.apps.claude || !c.peekOnQuestion) return // finished or failed: just the sound and the dot
     setTab('claude'); peek(8000)
   })
   const update = useUpdate()
@@ -97,6 +98,8 @@ export default function App() {
   const [now, setNow] = useState(new Date())
   const [focus, setFocus] = useState<FocusState>({ mins: 25, endAt: null, left: 25 * 60000 })
   const [used, setUsed] = useState(0)
+  const [sys, setSys] = useState<SysStats>({ cpu: null, ram: null, ramUsed: 0, ramTotal: 0, gpu: null })
+  useEffect(() => { window.kitty.stats().then(setSys); return window.kitty.onStats(setSys) }, [])
   const [fakeAir, setFakeAir] = useState<boolean | null>(null)
   const air = fakeAir ?? media.air
 
@@ -230,9 +233,15 @@ export default function App() {
     if (!settings.warnAt) return
     if (usagePct >= settings.warnAt && !usageWarned.current) {
       usageWarned.current = true
-      if (cfg.current.notifications) new Notification('Claude usage', { body: `You've used about ${usagePct}% of your 5-hour budget` })
-      if (cfg.current.sounds) sounds.error()
-      showMood('scared', 4000); peek(6000)
+      // at most once per 5 hours, even across restarts, and never pops the island open
+      let last = 0
+      try { last = Number(localStorage.getItem('kitty-usage-warned') || 0) } catch {}
+      if (Date.now() - last > 5 * 3600 * 1000) {
+        try { localStorage.setItem('kitty-usage-warned', String(Date.now())) } catch {}
+        if (cfg.current.notifications) new Notification('Claude usage', { body: `You've used about ${usagePct}% of your 5-hour budget` })
+        if (cfg.current.sounds) sounds.error()
+        showMood('scared', 4000)
+      }
     } else if (usagePct < settings.warnAt - 15) usageWarned.current = false
   }, [usagePct, settings.warnAt])
 
@@ -285,7 +294,7 @@ export default function App() {
   const leftIcons = !open && (
     hud === 'vol' ? volIcon
       : hud === 'air' ? <Plane size={17} color="#ffb04a" />
-      : <>{m.playing && media.art && <img className="mini-art" alt="" src={`data:${media.art.mime};base64,${media.art.data}`} />}{air && <Plane size={16} color="#ffb04a" />}{priv?.mic && <span className="pdot mic"><Mic size={11} /></span>}{priv?.cam && <span className="pdot cam"><Video size={11} /></span>}</>
+      : <>{settings.statsRest && <Stats s={sys} on={settings.stats} compact />}{m.playing && media.art && <img className="mini-art" alt="" src={`data:${media.art.mime};base64,${media.art.data}`} />}{air && <Plane size={16} color="#ffb04a" />}{priv?.mic && <span className="pdot mic"><Mic size={11} /></span>}{priv?.cam && <span className="pdot cam"><Video size={11} /></span>}</>
   )
 
   return (
@@ -295,7 +304,7 @@ export default function App() {
         ref={island}
         className="island"
         initial={false}
-        animate={open ? SIZE.open : hud === 'vol' ? SIZE.hudVol : hud === 'air' ? SIZE.hudAir : hud === 'hi' ? SIZE.hudHi : SIZE.closed}
+        animate={open ? SIZE.open : hud === 'vol' ? SIZE.hudVol : hud === 'air' ? SIZE.hudAir : hud === 'hi' ? SIZE.hudHi : { width: SIZE.closed.width + (settings.statsRest ? statItems(sys, settings.stats).length * 56 : 0), height: SIZE.closed.height }}
         transition={spring}
         onMouseEnter={() => { hovered.current = true; setHud(null); setOpen(true) }}
         onDragEnter={() => { setOpen(true); setTab('tray') }}
@@ -338,7 +347,7 @@ export default function App() {
               <div className="view">
                 <AnimatePresence mode="wait">
                   <motion.div key={tab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.12 }}>
-                    {tab === 'home' ? <Home focus={focus} now={ms} media={media} claude={claude} info={info} hasCalendar={!!settings.calendarUrl} setFocus={setFocus} go={(t) => setTab(t)} connected={connected} />
+                    {tab === 'home' ? <Home focus={focus} now={ms} media={media} claude={claude} info={info} hasCalendar={!!settings.calendarUrl} setFocus={setFocus} go={(t) => setTab(t)} connected={connected} sys={settings.statsOpen ? sys : null} statsOn={settings.stats} />
                       : tab === 'focus' ? <Focus f={focus} set={setFocus} now={ms} />
                       : tab === 'claude' ? <Claude data={claude} connected={connected} now={ms} usage={{ pct: usagePct, used, budget: settings.usageBudget }} />
                       : tab === 'music' ? <Music media={media} now={ms} />

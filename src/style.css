@@ -336,3 +336,28 @@ button:focus-visible, [role='button']:focus-visible { outline: 2px solid #ffffff
 .bar:not(.rest) .right .grow { display: none; }
 .hc-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hc-badge { flex-shrink: 0; }
+
+/* ---- neon status dot ---- */
+.sdot { width: 10px; height: 10px; background: radial-gradient(circle at 38% 35%, #fff 0 16%, currentColor 46%) !important;
+  box-shadow: 0 0 3px currentColor, 0 0 8px currentColor, 0 0 16px currentColor, 0 0 26px color-mix(in srgb, currentColor 55%, transparent);
+  filter: saturate(1.6) brightness(1.12); }
+.sdot.working { animation: neon 1.8s ease-in-out infinite; }
+.sdot.question { animation: neon 0.75s ease-in-out infinite; }
+@keyframes neon { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.55; transform: scale(0.82); } }
+
+/* ---- CPU / RAM / GPU ---- */
+.stats { display: inline-flex; align-items: center; gap: 10px; font-variant-numeric: tabular-nums; }
+.stat { display: inline-flex; align-items: center; gap: 5px; }
+.stat small { font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em; color: #ffffff80; }
+.stat b { font-size: 12.5px; font-weight: 700; min-width: 30px; }
+.stats.compact { gap: 8px; } .stats.compact .stat { gap: 3px; } .stats.compact .stat small { font-size: 9.5px; } .stats.compact .stat b { font-size: 11.5px; min-width: 0; }
+.stat-bar { display: inline-block; width: 34px; height: 4px; border-radius: 2px; background: #ffffff1f; overflow: hidden; }
+.stat-bar > i { display: block; height: 100%; border-radius: 2px; transition: width 600ms var(--ease), background 300ms; }
+.strip .stats { flex-shrink: 0; }
+
+/* home strip: one tidy line, nothing wraps */
+.strip { white-space: nowrap; gap: 14px; }
+.strip > * { min-width: 0; }
+.chip-w, .chip-e { overflow: hidden; } .chip-w .dim, .chip-e .dim, .chip-e .ev { overflow: hidden; text-overflow: ellipsis; }
+.chip-e { flex-shrink: 1; justify-content: flex-end; }
+.strip .stat-bar { width: 26px; }

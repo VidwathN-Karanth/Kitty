@@ -395,7 +395,8 @@ export default function SettingsApp() {
             <Group title="Focus & notifications">
               <Row title="Traffic-light sounds" desc="Ding when done, pling for a question, low for an error."><button className="btn" onClick={() => sounds.done()}>Play</button><Toggle on={s.sounds} onChange={(v) => set({ sounds: v })} /></Row>
               <Row title="Sound level" desc="How loud the sounds are."><Seg value={s.soundLevel} onChange={(v) => { set({ soundLevel: v }); setSoundLevel(v); setTimeout(() => sounds.done(), 120) }} options={[['soft', 'Soft'], ['normal', 'Normal'], ['loud', 'Loud']]} /></Row>
-              <Row title="Windows notifications" desc="Notification for done, question, focus and limit."><Toggle on={s.notifications} onChange={(v) => set({ notifications: v })} /></Row>
+              <Row title="Open the island when Claude asks" desc="When Claude finishes it only plays the sound and lights the dot."><Toggle on={s.peekOnQuestion} onChange={(v) => set({ peekOnQuestion: v })} /></Row>
+              <Row title="Windows notifications" desc="Notification when Claude asks something, and for focus, battery and limit."><Toggle on={s.notifications} onChange={(v) => set({ notifications: v })} /></Row>
               <Row title="Warn at limit" desc={`Notify when you used this much of your 5-hour budget. Used now: about ${Math.round((used / Math.max(1, s.usageBudget)) * 100)}%.`}><Seg value={s.warnAt} onChange={(v) => set({ warnAt: v })} options={[[70, '70%'], [80, '80%'], [90, '90%'], [0, 'Never']]} /></Row>
               <Row title="5-hour budget" desc="Kitty can't see your plan's real limit, so pick a number of tokens that feels like 'full' to you."><Seg value={s.usageBudget} onChange={(v) => set({ usageBudget: v })} options={[[500000, '0.5M'], [1000000, '1M'], [2000000, '2M'], [5000000, '5M'], [10000000, '10M']]} /></Row>
             </Group>
@@ -412,6 +413,11 @@ export default function SettingsApp() {
                 <input className="txt" type="password" placeholder={s.calendarUrl ? '••••••••' : 'https://… .ics'} value={cal ?? ''} onChange={(e) => setCal(e.target.value)} />
                 <button className="btn" onClick={() => { set({ calendarUrl: (cal ?? '').trim() }); setCal(null) }}>{s.calendarUrl && !cal ? 'Remove' : 'Save'}</button>
               </Row>
+              <Row title="CPU, RAM and GPU" desc="Pick which usage numbers Kitty shows."><span className="minis">
+                {(['cpu', 'ram', 'gpu'] as const).map((k) => <label key={k}><Toggle on={s.stats[k]} onChange={(v) => set({ stats: { [k]: v } })} />{k.toUpperCase()}</label>)}
+              </span></Row>
+              <Row title="Show them in the resting notch" desc="Small numbers beside the cat while the island is closed."><Toggle on={s.statsRest} onChange={(v) => set({ statsRest: v })} /></Row>
+              <Row title="Show them in the open island" desc="With a little bar for each, on the Home screen."><Toggle on={s.statsOpen} onChange={(v) => set({ statsOpen: v })} /></Row>
               <Row title="Volume bar" desc="Show the volume in the island when you change it."><Toggle on={s.volumeBar} onChange={(v) => set({ volumeBar: v })} /></Row>
               <Row title="Battery indicator" desc="Show the laptop battery next to the cat."><Toggle on={s.showBattery} onChange={(v) => set({ showBattery: v })} /></Row>
               <Row title="Battery warning" desc="Laptop and Bluetooth (headphones, mouse) almost empty."><Toggle on={s.batteryWarning} onChange={(v) => set({ batteryWarning: v })} /></Row>

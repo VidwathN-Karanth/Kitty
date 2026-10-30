@@ -86,6 +86,7 @@ ipcMain.on('settings:open', (_e, pageId) => openSettings(pageId))
 ipcMain.handle('settings:get', () => settings.get())
 function applySettings(s) {
   refreshTray()
+  syncGpuHelper(s)
   info.settingsChanged(s)
   if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: s.startWithWindows })
   all('settings', s)
@@ -226,6 +227,39 @@ ipcMain.on('test:run', (_e, kind) => {
   win?.webContents.send('test', kind) // battery, airplane, volume, hi, confetti: handled in the island
 })
 
+// ---------- system stats: CPU and RAM from Node, GPU from a PowerShell helper (only while it is shown) ----------
+let sysStats = { cpu: null, ram: null, ramUsed: 0, ramTotal: 0, gpu: null }, gpuHelper = null, lastCpu = null
+const cpuTimes = () => os.cpus().reduce((a, c) => { const t = c.times; a.idle += t.idle; a.total += t.user + t.nice + t.sys + t.idle + t.irq; return a }, { idle: 0, total: 0 })
+function sampleStats() {
+  const t = cpuTimes()
+  if (lastCpu && t.total > lastCpu.total) sysStats.cpu = Math.max(0, Math.min(100, Math.round(100 * (1 - (t.idle - lastCpu.idle) / (t.total - lastCpu.total)))))
+  lastCpu = t
+  const total = os.totalmem(), free = os.freemem() // free = available memory on Windows, same as Task Manager
+  sysStats.ram = Math.round(100 * (1 - free / total))
+  sysStats.ramUsed = +((total - free) / 2 ** 30).toFixed(1)
+  sysStats.ramTotal = Math.round(total / 2 ** 30)
+  win?.webContents.send('stats', sysStats)
+}
+function syncGpuHelper(s) {
+  const want = s.stats.gpu && (s.statsRest || s.statsOpen)
+  if (want && !gpuHelper) {
+    gpuHelper = spawn('powershell.exe', ['-NoProfile', '-NoLogo', '-ExecutionPolicy', 'Bypass', '-File', unpacked('stats.ps1')], { windowsHide: true })
+    let buf = ''
+    gpuHelper.stdout.setEncoding('utf8')
+    gpuHelper.stdout.on('data', (d) => {
+      buf += d
+      let i
+      while ((i = buf.indexOf('\n')) >= 0) { const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1); try { sysStats.gpu = JSON.parse(line).gpu } catch {} }
+    })
+    gpuHelper.on('exit', () => { gpuHelper = null; sysStats.gpu = null; if (!quitting) setTimeout(() => syncGpuHelper(settings.get()), 5000) })
+  } else if (!want && gpuHelper) {
+    const h = gpuHelper; gpuHelper = null; sysStats.gpu = null
+    h.removeAllListeners('exit'); h.stdin.end(); h.kill()
+  }
+}
+ipcMain.handle('stats:get', () => sysStats)
+app.on('before-quit', () => gpuHelper?.kill())
+
 // ---------- chat ----------
 // Asks the user's own Claude through the Claude Code CLI (`claude -p`, prompt on stdin).
 // It runs in a folder called kitty-chat so its hook events can be ignored (a chat question is not a "job").
@@ -277,5 +311,7 @@ app.whenReady().then(() => {
     event: (e) => win?.webContents.send('claude:event', e),
   })
   registerShortcuts(settings.get().shortcuts)
+  sampleStats(); setInterval(sampleStats, 2000)
+  syncGpuHelper(settings.get())
 })
 app.on('window-all-closed', () => { if (!win || win.isDestroyed()) app.quit() })

@@ -15,10 +15,12 @@ type Settings = {
   sounds: boolean; soundLevel: 'soft' | 'normal' | 'loud'; notifications: boolean; confetti: boolean; warnAt: number; usageBudget: number
   speed: 'fast' | 'normal'; volumeBar: boolean; showBattery: boolean; batteryWarning: boolean; privacyDot: boolean; weatherCity: string; calendarUrl: string
   startWithWindows: boolean; testMode: boolean
+  stats: { cpu: boolean; ram: boolean; gpu: boolean }; statsRest: boolean; statsOpen: boolean; peekOnQuestion: boolean
   shortcuts: Record<ShortcutKey, string>
   apps: { claude: boolean; music: boolean; chat: boolean; focus: boolean; tray: boolean; clipboard: boolean; note: boolean; clock: boolean }
 }
-type SettingsPatch = Partial<Omit<Settings, 'apps' | 'shortcuts'>> & { apps?: Partial<Settings['apps']>; shortcuts?: Partial<Settings['shortcuts']> }
+type SettingsPatch = Partial<Omit<Settings, 'apps' | 'shortcuts' | 'stats'>> & { apps?: Partial<Settings['apps']>; shortcuts?: Partial<Settings['shortcuts']>; stats?: Partial<Settings['stats']> }
+type SysStats = { cpu: number | null; ram: number | null; ramUsed: number; ramTotal: number; gpu: number | null }
 
 interface Window {
   kitty: {
@@ -69,6 +71,8 @@ interface Window {
     onGoto(cb: (tab: string) => void): () => void
     onToggle(cb: () => void): void
     bump(name: 'focus' | 'answers'): void
+    stats(): Promise<SysStats>
+    onStats(cb: (s: SysStats) => void): () => void
     testRun(kind: string): void
     onTest(cb: (kind: string) => void): () => void
   }

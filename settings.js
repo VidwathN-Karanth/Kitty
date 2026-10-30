@@ -34,6 +34,9 @@ const DEFAULTS = {
   weatherCity: '', calendarUrl: '',
   startWithWindows: false,
   testMode: false,
+  // system stats: which ones, and where (the resting notch and/or the open island)
+  stats: { cpu: true, ram: true, gpu: true }, statsRest: true, statsOpen: true,
+  peekOnQuestion: true,   // open the island when Claude asks something (finishing only plays the sound + dot)
 
   shortcuts: {
     open: 'Ctrl+Alt+T', home: 'Ctrl+Alt+Shift+1', music: 'Ctrl+Alt+Shift+2', claude: 'Ctrl+Alt+Shift+3',
@@ -49,6 +52,7 @@ const merge = (base, p) => ({
   ...base, ...p,
   apps: { ...base.apps, ...(p.apps || {}) },
   shortcuts: { ...base.shortcuts, ...(p.shortcuts || {}) },
+  stats: { ...base.stats, ...(p.stats || {}) },
 })
 
 function load(dir) {

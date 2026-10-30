@@ -1,15 +1,19 @@
-// A light that runs around the island's sides and bottom while a song plays (the top edge stays dark, it touches
-// the screen edge). 'adaptive' uses the album art's colours, 'rainbow' every colour, 'white' a plain white light.
+// A thin light around the island's sides and bottom while a song plays (the top edge touches the screen and stays
+// dark). Two layers: a smooth, seamless blend of the colours that slowly circles the island, and a soft bright
+// highlight running over it. Colours are mixed in OKLCH so neighbouring colours blend without muddy bands.
 export default function RunningLight({ mode, palette }: { mode: 'adaptive' | 'rainbow' | 'white'; palette: string[] }) {
-  const cols = mode === 'white' ? ['#ffffff'] : palette
-  // a bright comet followed by a soft tail; for colour modes the comet cycles through the colours
-  const comet = mode === 'white'
-    ? 'transparent 0deg, transparent 220deg, #ffffff55 290deg, #ffffff 350deg, transparent 360deg'
-    : `transparent 0deg, ${cols.map((c, i) => `${c} ${150 + (i * 205) / Math.max(1, cols.length - 1)}deg`).join(', ')}, transparent 360deg`
-  const style = { ['--comet' as string]: `conic-gradient(from var(--run), ${comet})` }
+  const cols = mode === 'white' ? ['#ffffff', '#dfe6ff', '#ffffff', '#fff0e2'] : palette
+  const loop = [...cols, cols[0]] // repeat the first colour at the end: no seam where the circle closes
+  const stops = loop.map((c, i) => `${c} ${Math.round((i * 360) / (loop.length - 1))}deg`).join(', ')
+  const glow = mode === 'white' ? '#ffffff' : `color-mix(in oklch, ${cols[0]} 40%, #ffffff)`
+  const style = {
+    ['--blend' as string]: `conic-gradient(in oklch from var(--run), ${stops})`,
+    // highlight: fades in and out on both sides, so it never has a hard edge
+    ['--comet' as string]: `conic-gradient(from var(--run2), transparent 0deg, transparent 230deg, color-mix(in oklch, ${glow} 30%, transparent) 285deg, ${glow} 320deg, color-mix(in oklch, ${glow} 30%, transparent) 344deg, transparent 360deg)`,
+  }
   return (
-    <span className="runlight" aria-hidden style={style}>
-      <i className="rl-ring" /><i className="rl-ring soft" />
+    <span className={'runlight ' + mode} aria-hidden style={style}>
+      <i className="rl-blend" /><i className="rl-blend soft" /><i className="rl-comet" />
     </span>
   )
 }

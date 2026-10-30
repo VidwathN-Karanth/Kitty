@@ -185,7 +185,7 @@ ipcMain.on('tray:drag', async (e, p) => e.sender.startDrag({ file: p, icon: awai
 // ---------- media (Spotify etc.), volume, airplane mode, mic/camera ----------
 let media = { state: { active: false }, art: null, vol: null, air: false, priv: { mic: false, cam: false } }, helper
 let fake = null // Test mode can fake a song for a while
-const view = () => (fake && Date.now() < fake.until ? { ...media, state: fake.state, art: null } : media)
+const view = () => (fake && Date.now() < fake.until ? { ...media, state: fake.state } : media) // the test song borrows the last real cover
 const pushMedia = () => win?.webContents.send('media', view())
 function startMedia() {
   helper = spawn('powershell.exe', ['-NoProfile', '-NoLogo', '-ExecutionPolicy', 'Bypass', '-File', unpacked('media.ps1')], { windowsHide: true })

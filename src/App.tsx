@@ -20,7 +20,7 @@ import Clipboard from './Clipboard'
 import Focus, { FocusState } from './Focus'
 import { wearing } from './catStyle'
 import { useClaude, lightState } from './useClaude'
-import { useMedia, RAINBOW } from './useMedia'
+import { useMedia, RAINBOW, musicBackground } from './useMedia'
 import { useSettings, lights } from './useSettings'
 import { useUpdate, updateLabel } from './useUpdate'
 import { useInfo } from './useInfo'
@@ -50,7 +50,7 @@ export default function App() {
   const [volPop, setVolPop] = useState(false)
   const [hud, setHud] = useState<Hud>(null) // a quick status shown inside the collapsed notch
   const [tab, setTab] = useState<TabId>('home')
-  const { media, tint, palette } = useMedia()
+  const { media, tint, palette, bg } = useMedia()
   const hovered = useRef(false)
   const closeTimer = useRef<number | undefined>(undefined)
   const hudTimer = useRef<number | undefined>(undefined)
@@ -295,7 +295,7 @@ export default function App() {
   const leftIcons = !open && (
     hud === 'vol' ? volIcon
       : hud === 'air' ? <Plane size={17} color="#ffb04a" />
-      : <>{settings.statsRest && <Stats s={sys} on={settings.stats} compact />}{m.playing && media.art && <img className="mini-art" alt="" src={`data:${media.art.mime};base64,${media.art.data}`} />}{air && <Plane size={16} color="#ffb04a" />}{priv?.mic && <span className="pdot mic"><Mic size={11} /></span>}{priv?.cam && <span className="pdot cam"><Video size={11} /></span>}</>
+      : <>{settings.statsRest && <Stats s={sys} on={settings.stats} compact />}{air && <Plane size={16} color="#ffb04a" />}{priv?.mic && <span className="pdot mic"><Mic size={11} /></span>}{priv?.cam && <span className="pdot cam"><Video size={11} /></span>}</>
   )
 
   return (
@@ -317,7 +317,7 @@ export default function App() {
           initial={false}
           animate={{ borderBottomLeftRadius: open ? 34 : 16, borderBottomRightRadius: open ? 34 : 16 }}
           transition={spring}
-          style={{ background: tab === 'music' && open && tint ? `linear-gradient(180deg, #000 30%, ${tint})` : '#000' }}
+          style={{ background: tab === 'music' && open && bg.length ? musicBackground(bg) : tab === 'music' && open && tint ? `linear-gradient(180deg, #000 30%, ${tint})` : '#000', transition: 'background 600ms' }}
         >
           {media.state.playing && settings.musicGlow !== 'off' && <RunningLight mode={settings.musicGlow} palette={settings.musicGlow === 'rainbow' ? RAINBOW : palette} />}
           <div className={'bar' + (hud && !open ? ' compact' : !open ? ' rest' : '')}>

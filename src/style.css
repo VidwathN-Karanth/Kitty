@@ -383,3 +383,19 @@ button:focus-visible, [role='button']:focus-visible { outline: 2px solid #ffffff
 
 /* the play/pause icon is not the ring: keep it in normal flow, centred */
 .hc-ring > span svg { position: static; }
+
+/* ---- running light, refined: thin, two layers, smooth OKLCH blend + soft highlight ---- */
+@property --run2 { syntax: '<angle>'; inherits: true; initial-value: 0deg; }
+.runlight { animation: none; }
+.rl-blend, .rl-comet { position: absolute; inset: 0; border-radius: inherit; padding: 1.5px;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+.rl-blend { background: var(--blend); opacity: 0.9; animation: rl-turn 10s linear infinite; }
+.rl-blend.soft { padding: 3px; filter: blur(3px); opacity: 0.4; }
+.rl-comet { background: var(--comet); animation: rl-run 3.8s linear infinite; mix-blend-mode: screen; }
+.runlight.white .rl-blend { opacity: 0.55; }
+@keyframes rl-turn { to { --run: 360deg; } }
+@keyframes rl-run { to { --run2: 360deg; } }
+
+/* music view: the source chip sits top-right beside the title, clear of the progress bar */
+.music { position: relative; }
+.m-src { top: 6px; right: 2px; bottom: auto !important; font-size: 12px; padding: 5px 11px; background: #ffffff1f; backdrop-filter: blur(6px); }

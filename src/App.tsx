@@ -56,8 +56,10 @@ export default function App() {
   const hudTimer = useRef<number | undefined>(undefined)
   const openRef = useRef(false)
   openRef.current = open
-  const cfg = useRef(settings) // latest settings for callbacks created once
-  cfg.current = settings
+  const [paused, setPausedState] = useState(false)
+  useEffect(() => { window.kitty.isPaused().then(setPausedState); return window.kitty.onPaused(setPausedState) }, [])
+  const cfg = useRef(settings) // latest settings for callbacks created once (paused: no sounds, no notifications)
+  cfg.current = paused ? { ...settings, sounds: false, notifications: false } : settings
 
   // collapsed notch: widen just enough to show a status, then settle back (no full expand)
   const flash = (kind: Exclude<Hud, null>, ms = 1800) => {
@@ -122,8 +124,8 @@ export default function App() {
   // Focus timer finished: notify and reset. State lives here so it keeps running on other tabs.
   useEffect(() => {
     if (focus.endAt && now.getTime() >= focus.endAt) {
-      if (settings.notifications) new Notification('Kitty', { body: 'Focus block finished. Nice work!' })
-      if (settings.sounds) sounds.fanfare()
+      if (cfg.current.notifications) new Notification('Kitty', { body: 'Focus block finished. Nice work!' })
+      if (cfg.current.sounds) sounds.fanfare()
       confetti(); showMood('happy', 4000)
       window.kitty.bump('focus')
       setFocus({ mins: focus.mins, endAt: null, left: focus.mins * 60000 })

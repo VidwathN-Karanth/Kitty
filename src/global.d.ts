@@ -73,6 +73,8 @@ interface Window {
     bump(name: 'focus' | 'answers'): void
     stats(): Promise<SysStats>
     onStats(cb: (s: SysStats) => void): () => void
+    isPaused(): Promise<boolean>
+    onPaused(cb: (p: boolean) => void): () => void
     testRun(kind: string): void
     onTest(cb: (kind: string) => void): () => void
   }

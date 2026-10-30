@@ -58,17 +58,24 @@ function create() {
 
 // ---------- system tray ----------
 // Windows tucks new tray icons into the ^ overflow; drag the cat out of it onto the taskbar to keep it visible.
+// A click (left or right) opens the menu.
 let sysTray
+let paused = false
 function buildTrayMenu() {
   const s = settings.get()
   return Menu.buildFromTemplate([
-    { label: 'Open the island', click: () => win?.webContents.send('toggle') },
-    { label: 'Settings', click: () => openSettings() },
+    { label: paused ? 'Kitty is paused' : 'Kitty is running', enabled: false },
     { type: 'separator' },
+    { label: 'Mute sounds', type: 'checkbox', checked: !s.sounds, click: (i) => applySettings(settings.patch({ sounds: !i.checked })) },
+    { label: 'Pause', enabled: !paused, click: () => setPaused(true) },
+    { label: 'Resume', enabled: paused, click: () => setPaused(false) },
+    { type: 'separator' },
+    { label: 'Open the island', enabled: !paused, click: () => win?.webContents.send('toggle') },
+    { label: 'Settings', click: () => openSettings() },
     { label: 'Start with Windows', type: 'checkbox', checked: s.startWithWindows, enabled: app.isPackaged, click: (i) => applySettings(settings.patch({ startWithWindows: i.checked })) },
     { label: 'Check for updates', click: () => updater.check() },
     { type: 'separator' },
-    { label: 'Quit Kitty', click: () => app.quit() },
+    { label: 'Quit', click: () => app.quit() },
   ])
 }
 function makeTray() {
@@ -76,10 +83,31 @@ function makeTray() {
   sysTray = new Tray(img.isEmpty() ? nativeImage.createFromPath(path.join(__dirname, 'assets', 'tray.png')).resize({ width: 32, height: 32 }) : img)
   sysTray.setToolTip('Kitty')
   sysTray.setContextMenu(buildTrayMenu())
-  sysTray.on('click', () => win?.webContents.send('toggle'))      // click: open/close the island
-  sysTray.on('double-click', () => openSettings())                 // double click: Settings
+  sysTray.on('click', () => sysTray.popUpContextMenu())  // left click shows the same menu as right click
 }
-const refreshTray = () => sysTray?.setContextMenu(buildTrayMenu())
+const refreshTray = () => { sysTray?.setContextMenu(buildTrayMenu()); sysTray?.setToolTip(paused ? 'Kitty (paused)' : 'Kitty') }
+
+// Pause: the island disappears and Kitty stops doing work (music/GPU helpers, cursor, clipboard, stats, shortcuts,
+// sounds and pop-ups) until Resume. Claude's hooks keep posting, but nothing is shown while paused.
+function setPaused(p) {
+  if (p === paused) return
+  paused = p
+  if (p) {
+    globalShortcut.unregisterAll()
+    win?.webContents.setAudioMuted(true)
+    win?.hide()
+    if (helper) { const h = helper; helper = null; h.removeAllListeners('exit'); h.kill() }
+  } else {
+    win?.webContents.setAudioMuted(false)
+    win?.showInactive(); win?.setAlwaysOnTop(true, 'screen-saver')
+    registerShortcuts(settings.get().shortcuts)
+    if (!helper) startMedia()
+  }
+  syncGpuHelper(settings.get())
+  win?.webContents.send('paused', p)
+  refreshTray()
+}
+ipcMain.handle('paused:get', () => paused)
 
 // ---------- settings ----------
 ipcMain.on('settings:open', (_e, pageId) => openSettings(pageId))
@@ -127,7 +155,7 @@ ipcMain.on('rect', (_e, r) => { rect = r })
 let tracking = true, last = ''
 function poll() {
   let still = true
-  if (win && !win.isDestroyed()) {
+  if (!paused && win && !win.isDestroyed()) {
     const p = screen.getCursorScreenPoint(), b = win.getBounds()
     const x = p.x - b.x, y = p.y - b.y
     const inside = x >= rect.x - 4 && x <= rect.x + rect.w + 4 && y >= rect.y && y <= rect.y + rect.h + 4
@@ -147,7 +175,7 @@ function watchClipboard() {
   // Electron 45 made the clipboard calls asynchronous, so everything here is awaited
   let busy = false
   setInterval(async () => {
-    if (busy) return
+    if (busy || paused) return
     busy = true
     try {
       // password managers set this format; if it is there, don't record the copy
@@ -207,7 +235,7 @@ function startMedia() {
       } catch {}
     }
   })
-  helper.on('exit', () => { helper = null; if (!quitting) setTimeout(startMedia, 3000) })
+  helper.on('exit', () => { helper = null; if (!quitting && !paused) setTimeout(startMedia, 3000) })
 }
 let quitting = false
 app.on('before-quit', () => { quitting = true; helper?.kill() })
@@ -220,6 +248,7 @@ ipcMain.on('stat:bump', (_e, name) => { if (['focus', 'answers'].includes(name))
 
 // ---------- Test mode: try every state without real Claude work or music ----------
 ipcMain.on('test:run', (_e, kind) => {
+  if (kind === 'pause' || kind === 'resume') return setPaused(kind === 'pause')
   if (['working', 'question', 'done', 'long', 'error', 'clear'].includes(kind)) return claude.simulate(kind)
   if (kind === 'music-on') { fake = { until: Date.now() + 60000, state: { active: true, title: 'Test Song', artist: 'Kitty Band', playing: true, pos: 20, end: 180, app: 'Test', at: Date.now() } }; return pushMedia() }
   if (kind === 'music-off') { fake = null; return pushMedia() }
@@ -231,6 +260,7 @@ ipcMain.on('test:run', (_e, kind) => {
 let sysStats = { cpu: null, ram: null, ramUsed: 0, ramTotal: 0, gpu: null }, gpuHelper = null, lastCpu = null
 const cpuTimes = () => os.cpus().reduce((a, c) => { const t = c.times; a.idle += t.idle; a.total += t.user + t.nice + t.sys + t.idle + t.irq; return a }, { idle: 0, total: 0 })
 function sampleStats() {
+  if (paused) return
   const t = cpuTimes()
   if (lastCpu && t.total > lastCpu.total) sysStats.cpu = Math.max(0, Math.min(100, Math.round(100 * (1 - (t.idle - lastCpu.idle) / (t.total - lastCpu.total)))))
   lastCpu = t
@@ -241,7 +271,7 @@ function sampleStats() {
   win?.webContents.send('stats', sysStats)
 }
 function syncGpuHelper(s) {
-  const want = s.stats.gpu && (s.statsRest || s.statsOpen)
+  const want = !paused && s.stats.gpu && (s.statsRest || s.statsOpen)
   if (want && !gpuHelper) {
     gpuHelper = spawn('powershell.exe', ['-NoProfile', '-NoLogo', '-ExecutionPolicy', 'Bypass', '-File', unpacked('stats.ps1')], { windowsHide: true })
     let buf = ''
@@ -316,7 +346,7 @@ app.whenReady().then(() => {
   claude.start({
     userDataDir: app.getPath('userData'),
     change: (snap) => all('claude', snap),
-    event: (e) => win?.webContents.send('claude:event', e),
+    event: (e) => { if (!paused) win?.webContents.send('claude:event', e) },
   })
   registerShortcuts(settings.get().shortcuts)
   sampleStats(); setInterval(sampleStats, 2000)

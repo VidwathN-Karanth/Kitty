@@ -35,5 +35,6 @@ contextBridge.exposeInMainWorld('kitty', {
   info: call('info:get'), onInfo: on('info'), openUrl: send('open:url'),
   onGoto: on('goto'), onToggle: (cb) => ipcRenderer.on('toggle', cb), bump: send('stat:bump'),
   stats: call('stats:get'), onStats: on('stats'),
+  isPaused: call('paused:get'), onPaused: on('paused'),
   testRun: send('test:run'), onTest: on('test'),
 })

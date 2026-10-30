@@ -10,6 +10,7 @@ import Music from './Music'
 import Claude from './Claude'
 import Chat from './Chat'
 import Bars from './Bars'
+import Battery from './Battery'
 import StatusDot from './StatusDot'
 import Confetti from './Confetti'
 import Volume from './Volume'
@@ -27,7 +28,7 @@ type Hud = 'vol' | 'air' | 'hi' | null
 
 // A MacBook-style notch: flat against the top edge, rounded at the bottom, with small concave "ears" at the top corners
 const SIZE = {
-  closed: { width: 200, height: 34 }, hudVol: { width: 244, height: 34 }, hudAir: { width: 262, height: 34 }, hudHi: { width: 280, height: 34 },
+  closed: { width: 262, height: 34 }, hudVol: { width: 244, height: 34 }, hudAir: { width: 262, height: 34 }, hudHi: { width: 280, height: 34 },
   open: { width: 640, height: 300 },
 }
 const SPRINGS = {
@@ -284,7 +285,7 @@ export default function App() {
   const leftIcons = !open && (
     hud === 'vol' ? volIcon
       : hud === 'air' ? <Plane size={17} color="#ffb04a" />
-      : <>{air && <Plane size={16} color="#ffb04a" />}{priv?.mic && <span className="pdot mic"><Mic size={11} /></span>}{priv?.cam && <span className="pdot cam"><Video size={11} /></span>}</>
+      : <>{m.playing && media.art && <img className="mini-art" alt="" src={`data:${media.art.mime};base64,${media.art.data}`} />}{air && <Plane size={16} color="#ffb04a" />}{priv?.mic && <span className="pdot mic"><Mic size={11} /></span>}{priv?.cam && <span className="pdot cam"><Video size={11} /></span>}</>
   )
 
   return (
@@ -308,10 +309,11 @@ export default function App() {
           transition={spring}
           style={{ background: tab === 'music' && open && tint ? `linear-gradient(180deg, #000 30%, ${tint})` : '#000' }}
         >
-          <div className={'bar' + (hud && !open ? ' compact' : '')}>
+          <div className={'bar' + (hud && !open ? ' compact' : !open ? ' rest' : '')}>
             <span className="title">{leftIcons}{open && tab !== 'home' && <>{t1}<span style={{ color: cur.color }}>{t2}</span></>}</span>
             <span className="mid">
               <Cat size={34} follow={settings.follow} light={light?.color} mood={mood} dance={dance} blink={settings.blinking} wave={hud === 'hi'} body={look.body} eyes={look.eyes} />
+              {open && settings.showBattery && laptop && <Battery level={laptop.level} charging={laptop.charging} />}
               {open && settings.apps.clock && <span className="clock">{date} <b>{time}</b></span>}
             </span>
             <span className="right">
@@ -319,6 +321,8 @@ export default function App() {
                 : hud === 'hi' && !open ? <span className="hud"><b className="air-t">Hi, I&apos;m {settings.name}!</b></span>
                 : hud === 'vol' && !open ? <span className="hud"><span className="hud-track"><i style={{ width: `${(media.vol?.mute ? 0 : media.vol?.v ?? 0) * 100}%` }} /></span><b>{Math.round((media.vol?.mute ? 0 : media.vol?.v ?? 0) * 100)}</b></span>
                 : <>
+                    {!open && settings.showBattery && laptop && <Battery level={laptop.level} charging={laptop.charging} />}
+                    <span className="grow" />
                     {open && air && <Plane size={16} color="#ffb04a" aria-label="Airplane mode" />}
                     {open && priv?.mic && <span className="pdot mic"><Mic size={11} /></span>}
                     {open && priv?.cam && <span className="pdot cam"><Video size={11} /></span>}
@@ -334,7 +338,7 @@ export default function App() {
               <div className="view">
                 <AnimatePresence mode="wait">
                   <motion.div key={tab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.12 }}>
-                    {tab === 'home' ? <Home focus={focus} now={ms} media={media} claude={claude} info={info} hasCalendar={!!settings.calendarUrl} setFocus={setFocus} />
+                    {tab === 'home' ? <Home focus={focus} now={ms} media={media} claude={claude} info={info} hasCalendar={!!settings.calendarUrl} setFocus={setFocus} go={(t) => setTab(t)} connected={connected} />
                       : tab === 'focus' ? <Focus f={focus} set={setFocus} now={ms} />
                       : tab === 'claude' ? <Claude data={claude} connected={connected} now={ms} usage={{ pct: usagePct, used, budget: settings.usageBudget }} />
                       : tab === 'music' ? <Music media={media} now={ms} />

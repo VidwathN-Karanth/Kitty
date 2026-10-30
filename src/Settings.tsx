@@ -413,6 +413,7 @@ export default function SettingsApp() {
                 <button className="btn" onClick={() => { set({ calendarUrl: (cal ?? '').trim() }); setCal(null) }}>{s.calendarUrl && !cal ? 'Remove' : 'Save'}</button>
               </Row>
               <Row title="Volume bar" desc="Show the volume in the island when you change it."><Toggle on={s.volumeBar} onChange={(v) => set({ volumeBar: v })} /></Row>
+              <Row title="Battery indicator" desc="Show the laptop battery next to the cat."><Toggle on={s.showBattery} onChange={(v) => set({ showBattery: v })} /></Row>
               <Row title="Battery warning" desc="Laptop and Bluetooth (headphones, mouse) almost empty."><Toggle on={s.batteryWarning} onChange={(v) => set({ batteryWarning: v })} /></Row>
               <Row title="Mic and camera dots" desc="An orange or green dot when an app is using your microphone or camera."><Toggle on={s.privacyDot} onChange={(v) => set({ privacyDot: v })} /></Row>
               <Row title="Reset everything" desc="Set all these choices back to default (keeps your names, city and calendar)."><button className="btn" onClick={() => window.kitty.resetSettings()}>Reset</button></Row>

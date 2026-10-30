@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
+import Outfits from './Outfits'
 import { bodyColor, eyeColor, Outfit } from './catStyle'
 
 export type Mood =
@@ -50,9 +51,8 @@ const STAR = 'M0 -10 L2.9 -3.1 L9.5 -3.1 L4.2 1.4 L6 8.1 L0 4.3 L-6 8.1 L-4.2 1.
 
 // Cartoon cat. Pupils follow the cursor when `follow` is on. `mood` sets eyes, brows, mouth and little extras;
 // 'listening' puts headphones on. `wave` makes the cat wave a paw (startup greeting).
-export default function Cat({ size = 36, follow = true, light, mood = 'normal', dance = false, body = 'orange', eyes = 'mint', outfit = 'none', blink = true, wave = false }: {
-  size?: number; follow?: boolean; light?: string; mood?: Mood; dance?: boolean; body?: string; eyes?: string; outfit?: Outfit; blink?: boolean; wave?: boolean
-}) {
+type CatProps = { size?: number; follow?: boolean; light?: string; mood?: Mood; dance?: boolean; body?: string; eyes?: string; outfit?: Outfit; blink?: boolean; wave?: boolean }
+function VectorCat({ size = 36, follow = true, light, mood = 'normal', dance = false, body = 'orange', eyes = 'mint', outfit = 'none', blink = true, wave = false }: CatProps) {
   const uid = useId()
   const svg = useRef<SVGSVGElement>(null)
   const pupils = useRef<(SVGGElement | null)[]>([])
@@ -175,11 +175,68 @@ export default function Cat({ size = 36, follow = true, light, mood = 'normal', 
       )}
       {wave && <g className="wavepaw" style={{ transformOrigin: '86px 74px' }}><ellipse cx="86" cy="64" rx="7" ry="9" fill={HEAD} stroke={SHADE} strokeWidth="1.4" /><path d="M83 59 v4 M86 58 v5 M89 59 v4" stroke={SHADE} strokeWidth="1" strokeLinecap="round" /></g>}
 
-      {fancy && outfit === 'party' && <g><path d="M38 22 L50 -10 L62 22 Z" fill="#ff6fae" /><path d="M43 12 L57 12 M40 19 L60 19" stroke="#fff" strokeWidth="2.5" /><circle cx="50" cy="-11" r="4" fill="#ffd84a" /></g>}
-      {fancy && outfit === 'sunglasses' && <g><rect x="20" y="37" width="30" height="19" rx="8" fill="#15151a" /><rect x="50" y="37" width="30" height="19" rx="8" fill="#15151a" /><path d="M26 41 L32 41" stroke="#fff" strokeOpacity=".5" strokeWidth="2.5" strokeLinecap="round" /></g>}
-      {fancy && (outfit === 'crown' || outfit === 'kings') && <g><path d="M35 24 L36 4 L44 14 L50 0 L56 14 L64 4 L65 24 Z" fill={outfit === 'kings' ? '#ff8a1f' : '#f6c443'} stroke="#c9961a" strokeWidth="1.2" /><circle cx="50" cy="16" r="2.6" fill="#ff5a7a" /><circle cx="41" cy="18" r="2" fill="#6ec6ff" /><circle cx="59" cy="18" r="2" fill="#6ec6ff" /></g>}
-      {fancy && outfit === 'santa' && <g><path d="M30 24 Q38 -14 70 -2 Q62 8 66 24 Z" fill="#d9362f" /><rect x="28" y="19" width="42" height="9" rx="4.5" fill="#fff" /><circle cx="71" cy="-2" r="5" fill="#fff" /></g>}
-      {fancy && outfit === 'witch' && <g><path d="M36 22 L56 -22 L66 22 Z" fill="#3b2a5c" /><rect x="40" y="10" width="22" height="6" fill="#f0a030" /><ellipse cx="50" cy="22" rx="30" ry="5.5" fill="#3b2a5c" /></g>}
+      {fancy && <Outfits outfit={outfit} />}
     </svg>
   )
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Artwork mode. Drop the sliced PNGs from Gemini into src/assets/cat/ (see docs/CAT_ART_PROMPT.md) and Kitty uses
+// them automatically; without them the drawn vector cat above is used. Frames are swapped, so fur and eye colour
+// options only apply to the vector cat. Outfits are drawn on top of either.
+// ---------------------------------------------------------------------------------------------------------------
+const artFiles = import.meta.glob('./assets/cat/*.png', { eager: true, query: '?url', import: 'default' }) as Record<string, string>
+const ART: Record<string, string> = Object.fromEntries(Object.entries(artFiles).map(([k, v]) => [k.split('/').pop()!.replace('.png', ''), v]))
+export const HAS_ART = !!ART.normal
+
+// artwork frame layout (see the prompt): head width 66% of the frame, centred at 50% / 58%, ear tips at about 20%
+const OUTFIT_MAP = 'translate(50 58) scale(0.825) translate(-50 -48)'
+
+function ArtCat({ size, follow, mood, dance, outfit, blink, wave }: { size: number; follow: boolean; mood: Mood; dance: boolean; outfit: Outfit; blink: boolean; wave: boolean }) {
+  const box = useRef<HTMLDivElement>(null)
+  const [dir, setDir] = useState<'' | 'left' | 'right' | 'up' | 'down'>('')
+  const [blinking, setBlinking] = useState(false)
+
+  useEffect(() => { Object.values(ART).forEach((u) => { const i = new Image(); i.src = u }) }, []) // no flicker when swapping
+
+  // look where the cursor is: pick the nearest of the four "look" frames
+  useEffect(() => {
+    if (!follow) { setDir(''); return }
+    return window.kitty.onCursor(({ x, y }) => {
+      const r = box.current?.getBoundingClientRect()
+      if (!r) return
+      const dx = x - (r.left + r.width / 2), dy = y - (r.top + r.height / 2)
+      const next = Math.hypot(dx, dy) < 90 ? '' : Math.abs(dx) > Math.abs(dy) * 1.2 ? (dx < 0 ? 'left' : 'right') : dy < 0 ? 'up' : 'down'
+      setDir((d) => (d === next ? d : next))
+    })
+  }, [follow])
+
+  // blink every few seconds
+  useEffect(() => {
+    if (!blink || !ART.blink) return
+    let t: number
+    const loop = () => { t = window.setTimeout(() => { setBlinking(true); window.setTimeout(() => setBlinking(false), 130); loop() }, 3500 + Math.random() * 3000) }
+    loop()
+    return () => clearTimeout(t)
+  }, [blink])
+
+  const calm = mood === 'normal'
+  const frame = wave && ART.wave ? 'wave' : calm && blinking && ART.blink ? 'blink' : calm && dir && ART['look-' + dir] ? 'look-' + dir : ART[mood] ? mood : 'normal'
+  return (
+    <div ref={box} className={dance ? 'dance' : ''} style={{ position: 'relative', width: size, height: size * 0.8, flexShrink: 0 }}>
+      <img src={ART[frame]} alt="" draggable={false} style={{ position: 'absolute', left: 0, top: -size * 0.1, width: size, height: size, objectFit: 'contain', userSelect: 'none' }} />
+      {size >= 60 && outfit !== 'none' && (
+        <svg viewBox="0 0 100 100" style={{ position: 'absolute', left: 0, top: -size * 0.1, width: size, height: size, overflow: 'visible' }}>
+          <g transform={OUTFIT_MAP}><Outfits outfit={outfit} /></g>
+        </svg>
+      )}
+    </div>
+  )
+}
+
+// The cat everyone imports: artwork when it has been added, otherwise the drawn one
+export default function Cat(props: CatProps) {
+  return HAS_ART
+    ? <ArtCat size={props.size ?? 36} follow={props.follow ?? true} mood={props.mood ?? 'normal'} dance={props.dance ?? false} outfit={props.outfit ?? 'none'} blink={props.blink ?? true} wave={props.wave ?? false} />
+    : <VectorCat {...props} />
 }

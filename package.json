@@ -38,6 +38,8 @@
       "output": "release"
     },
     "files": [
+      "assets/tray.ico",
+      "assets/tray.png",
       "bt.ps1",
       "claude.js",
       "dist/**/*",

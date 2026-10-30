@@ -13,7 +13,7 @@ type Settings = {
   bodyColor: string; eyeColor: string; outfit: string; seasonal: boolean
   lightPreset: string; lightWork: string; lightDone: string; lightError: string
   sounds: boolean; soundLevel: 'soft' | 'normal' | 'loud'; notifications: boolean; confetti: boolean; warnAt: number; usageBudget: number
-  speed: 'fast' | 'normal'; volumeBar: boolean; batteryWarning: boolean; privacyDot: boolean; weatherCity: string; calendarUrl: string
+  speed: 'fast' | 'normal'; volumeBar: boolean; showBattery: boolean; batteryWarning: boolean; privacyDot: boolean; weatherCity: string; calendarUrl: string
   startWithWindows: boolean; testMode: boolean
   shortcuts: Record<ShortcutKey, string>
   apps: { claude: boolean; music: boolean; chat: boolean; focus: boolean; tray: boolean; clipboard: boolean; note: boolean; clock: boolean }

@@ -30,4 +30,4 @@ function start(onStatus) {
   setInterval(check, 6 * 3600 * 1000)
 }
 
-module.exports = { start }
+module.exports = { start, check }

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, globalShortcut, screen, clipboard, shell, powerMonitor } = require('electron')
+const { app, BrowserWindow, ipcMain, globalShortcut, screen, clipboard, shell, powerMonitor, Tray, Menu, nativeImage } = require('electron')
 const path = require('path')
 const fs = require('fs')
 const { spawn, execFile } = require('child_process')
@@ -56,10 +56,36 @@ function create() {
   page(win, {})
 }
 
+// ---------- system tray ----------
+// Windows tucks new tray icons into the ^ overflow; drag the cat out of it onto the taskbar to keep it visible.
+let sysTray
+function buildTrayMenu() {
+  const s = settings.get()
+  return Menu.buildFromTemplate([
+    { label: 'Open the island', click: () => win?.webContents.send('toggle') },
+    { label: 'Settings', click: () => openSettings() },
+    { type: 'separator' },
+    { label: 'Start with Windows', type: 'checkbox', checked: s.startWithWindows, enabled: app.isPackaged, click: (i) => applySettings(settings.patch({ startWithWindows: i.checked })) },
+    { label: 'Check for updates', click: () => updater.check() },
+    { type: 'separator' },
+    { label: 'Quit Kitty', click: () => app.quit() },
+  ])
+}
+function makeTray() {
+  const img = nativeImage.createFromPath(path.join(__dirname, 'assets', 'tray.ico'))
+  sysTray = new Tray(img.isEmpty() ? nativeImage.createFromPath(path.join(__dirname, 'assets', 'tray.png')).resize({ width: 32, height: 32 }) : img)
+  sysTray.setToolTip('Kitty')
+  sysTray.setContextMenu(buildTrayMenu())
+  sysTray.on('click', () => win?.webContents.send('toggle'))      // click: open/close the island
+  sysTray.on('double-click', () => openSettings())                 // double click: Settings
+}
+const refreshTray = () => sysTray?.setContextMenu(buildTrayMenu())
+
 // ---------- settings ----------
 ipcMain.on('settings:open', (_e, pageId) => openSettings(pageId))
 ipcMain.handle('settings:get', () => settings.get())
 function applySettings(s) {
+  refreshTray()
   info.settingsChanged(s)
   if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: s.startWithWindows })
   all('settings', s)
@@ -117,16 +143,22 @@ ipcMain.on('track', (_e, on) => { tracking = on })
 // ---------- clipboard ----------
 let clips = []
 function watchClipboard() {
-  setInterval(() => {
+  // Electron 45 made the clipboard calls asynchronous, so everything here is awaited
+  let busy = false
+  setInterval(async () => {
+    if (busy) return
+    busy = true
     try {
-      // password managers set this format; a non-empty buffer means "don't record"
-      if (clipboard.readBuffer('ExcludeClipboardContentFromMonitorProcessing').length) return
-      const text = clipboard.readText()
-      if (text && text !== clips[0]?.text) {
+      // password managers set this format; if it is there, don't record the copy
+      let skip = false
+      try { skip = !!(await clipboard.has('ExcludeClipboardContentFromMonitorProcessing')) } catch {}
+      if (skip) return
+      const text = await clipboard.readText()
+      if (typeof text === 'string' && text && text !== clips[0]?.text) {
         clips = [{ text, t: Date.now() }, ...clips.filter((c) => c.text !== text)].slice(0, 20)
         win?.webContents.send('clips', clips)
       }
-    } catch (e) { console.log('[clipboard]', e.message) }
+    } catch (e) { console.log('[clipboard]', e.message) } finally { busy = false }
   }, 1000)
 }
 ipcMain.handle('clips:get', () => clips)
@@ -233,6 +265,7 @@ app.whenReady().then(() => {
   settings.load(app.getPath('userData'))
   info.start(settings.get(), (i) => all('info', i))
   create()
+  makeTray()
   poll()
   watchClipboard()
   startMedia()

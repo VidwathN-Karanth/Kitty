@@ -11,9 +11,19 @@ export default function Claude({ data, connected, now, usage }: { data: ClaudeDa
   const s = pickSession(data.sessions)
 
   if (!connected)
-    return <div className="body">Claude Code isn&apos;t connected. Open <b>Settings → Connections</b> and turn on <b>Claude Code</b>.</div>
+    return (
+      <div className="cl-empty">
+        <span className="ico"><ClaudeMark size={24} color="#fff" /></span>
+        <div><b>Claude Code isn&apos;t connected yet</b><p>Open <b style={{ display: 'inline' }}>Settings → Connections</b> and turn on Claude Code. Kitty then shows what it is doing, live.</p></div>
+      </div>
+    )
   if (!s)
-    return <div className="body">No Claude Code activity yet. Start a session and it shows up here. {data.stats.today} jobs today.</div>
+    return (
+      <div className="cl-empty">
+        <span className="ico"><ClaudeMark size={24} color="#fff" /></span>
+        <div><b>Give Claude Code a job in your terminal</b><p>You&apos;ll see what it does here, live: the steps, the timer and when it needs you. {data.stats.today} {data.stats.today === 1 ? 'job' : 'jobs'} done today.</p></div>
+      </div>
+    )
 
   const status = s.state === 'question' || s.state === 'error' ? s.label : s.state === 'done' ? `Done · ${mmss((s.endedAt ?? now) - s.startedAt)}` : `${s.label} · step ${s.step + 1} of 4`
   const light = s.state === 'done' ? '#5fe05f' : s.state === 'error' ? '#e5483d' : '#f0a030'

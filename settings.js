@@ -30,7 +30,7 @@ const DEFAULTS = {
   usageBudget: 1000000,   // tokens you consider "full" for 5 hours (Kitty cannot see your plan's real limit)
 
   // island
-  speed: 'fast', volumeBar: true, batteryWarning: true, privacyDot: true,
+  speed: 'fast', volumeBar: true, showBattery: true, batteryWarning: true, privacyDot: true,
   weatherCity: '', calendarUrl: '',
   startWithWindows: false,
   testMode: false,

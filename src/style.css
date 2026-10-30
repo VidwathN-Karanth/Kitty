@@ -399,3 +399,13 @@ button:focus-visible, [role='button']:focus-visible { outline: 2px solid #ffffff
 /* music view: the source chip sits top-right beside the title, clear of the progress bar */
 .music { position: relative; }
 .m-src { top: 6px; right: 2px; bottom: auto !important; font-size: 12px; padding: 5px 11px; background: #ffffff1f; backdrop-filter: blur(6px); }
+
+/* the gradients are built on .runlight from --run / --run2, so that is where the angles must animate
+   (animating them on the children left the inherited gradient frozen) */
+.runlight { animation: rl-turn 10s linear infinite, rl-run 3.6s linear infinite !important; }
+.rl-blend, .rl-comet { animation: none !important; }
+
+/* final: every ring animates its own angle and draws its own gradient from it */
+.runlight { animation: none !important; }
+.rl-blend { background: conic-gradient(in oklch from var(--run), var(--stops)) !important; animation: rl-turn 10s linear infinite !important; }
+.rl-comet { background: conic-gradient(from var(--run2), var(--cstops)) !important; animation: rl-run 3.6s linear infinite !important; }

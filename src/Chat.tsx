@@ -23,9 +23,10 @@ export default function Chat({ name, follow, look, mood, setMood, blink }: {
 
   useEffect(() => {
     const offA = window.kitty.onChatChunk(({ id, text: t }) => { if (id === reqId.current) setAnswer((a) => a + t) })
-    const offB = window.kitty.onChatDone(({ id, error }) => {
+    const offB = window.kitty.onChatDone(({ id, error, clear }) => {
       if (id !== reqId.current) return
       setBusy(false)
+      if (clear) setAnswer('')
       if (error) { setNote(error); setMood('sad') } else setMood('happy')
     })
     return () => { offA(); offB() }

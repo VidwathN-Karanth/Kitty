@@ -8,7 +8,7 @@ const path = require('path')
 const PORT = 47821
 const MARKER = `127.0.0.1:${PORT}/hook`
 const CMD = `curl.exe -s -m 2 -X POST -H "Content-Type: application/json" --data-binary @- http://${MARKER}`
-const EVENTS = ['UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Notification', 'Stop']
+const EVENTS = ['UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Notification', 'Stop', 'StopFailure']
 const SETTINGS = process.env.KITTY_CLAUDE_SETTINGS || path.join(os.homedir(), '.claude', 'settings.json') // env override is for tests
 
 const STEPS = ['Read', 'Edit', 'Test', 'Done']

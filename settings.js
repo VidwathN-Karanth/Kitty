@@ -30,6 +30,7 @@ const DEFAULTS = {
   usageBudget: 1000000,   // tokens you consider "full" for 5 hours (Kitty cannot see your plan's real limit)
 
   // island
+  musicGlow: 'adaptive', // running light around the island while music plays: adaptive | rainbow | white | off
   speed: 'fast', volumeBar: true, showBattery: true, batteryWarning: true, privacyDot: true,
   weatherCity: '', calendarUrl: '',
   startWithWindows: false,

@@ -4,6 +4,9 @@
 Add-Type -AssemblyName System.Runtime.WindowsRuntime
 $null = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType = WindowsRuntime]
 $null = [Windows.Storage.Streams.IRandomAccessStreamReference, Windows.Storage.Streams, ContentType = WindowsRuntime]
+$null = [Windows.Storage.Streams.IRandomAccessStreamWithContentType, Windows.Storage.Streams, ContentType = WindowsRuntime]
+$null = [Windows.Storage.Streams.IInputStream, Windows.Storage.Streams, ContentType = WindowsRuntime]
+$asStream = [System.IO.WindowsRuntimeStreamExtensions].GetMethod('AsStreamForRead', [type[]]@([Windows.Storage.Streams.IInputStream]))
 
 $asTask = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object {
   $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation`1' })[0]
@@ -138,9 +141,12 @@ while ($true) {
         if ($needArt -and $p.Thumbnail) {
           try {
             $rs = Await ($p.Thumbnail.OpenReadAsync()) ([Windows.Storage.Streams.IRandomAccessStreamWithContentType])
-            $st = [System.IO.WindowsRuntimeStreamExtensions]::AsStreamForRead($rs)
+            # PowerShell 5 sees the stream as a bare COM object, so the .NET wrapper is called through reflection
+            $st = $asStream.Invoke($null, @($rs))
             $ms = New-Object System.IO.MemoryStream; $st.CopyTo($ms)
-            Emit @{ type = 'art'; mime = $rs.ContentType; data = [Convert]::ToBase64String($ms.ToArray()) }
+            $bytes = $ms.ToArray()
+            $mime = if ($bytes.Length -gt 3 -and $bytes[0] -eq 0x89 -and $bytes[1] -eq 0x50) { 'image/png' } elseif ($bytes.Length -gt 2 -and $bytes[0] -eq 0xFF -and $bytes[1] -eq 0xD8) { 'image/jpeg' } else { 'image/png' }
+            if ($bytes.Length -gt 0) { Emit @{ type = 'art'; mime = $mime; data = [Convert]::ToBase64String($bytes) } }
             $needArt = $false
           } catch {}
         }

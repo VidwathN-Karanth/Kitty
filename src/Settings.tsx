@@ -163,7 +163,7 @@ export default function SettingsApp() {
     ['general', 'Test mode', 'try everything without real Claude or music'], ['general', 'Speed', 'animation speed'], ['general', 'App animations', 'trick when you open an app'],
     ['general', 'Confetti', 'long tasks finished focus new outfits'], ['general', 'Traffic-light sounds', 'ding pling error sound'], ['general', 'Sound level', 'volume of the sounds'],
     ['general', 'Windows notifications', 'notifications'], ['general', 'Warn at limit', '5-hour usage limit budget'], ['general', 'Keyboard shortcuts', 'hotkeys keys'],
-    ['general', 'Weather', 'city'], ['general', 'Calendar', 'ical google meetings'], ['general', 'Volume bar', 'volume'], ['general', 'Battery warning', 'laptop bluetooth'],
+    ['general', 'Weather', 'city'], ['general', 'Calendar', 'ical google meetings'], ['general', 'Volume bar', 'volume'], ['general', 'Running light', 'music glow border rainbow white adaptive'], ['general', 'CPU, RAM and GPU', 'stats usage memory'], ['general', 'Battery warning', 'laptop bluetooth'],
     ['general', 'Mic and camera dots', 'privacy'], ['general', 'Start with Windows', 'autostart login'], ['general', 'Reset everything', 'defaults'], ['general', 'Updates', 'version update'],
     ['kitty', 'Name', 'cat name your name'], ['kitty', 'Traffic-light eyes', 'colours classic soft colour-blind'], ['kitty', 'Faces', 'emotions expressions'], ['kitty', 'Blinking', ''],
     ['kitty', 'Dancing to music', 'headphones'], ['kitty', 'Sleep effect', 'falls asleep idle'], ['kitty', 'Startup animation', 'wave hi'], ['kitty', 'Hunger', 'food'],
@@ -413,6 +413,7 @@ export default function SettingsApp() {
                 <input className="txt" type="password" placeholder={s.calendarUrl ? '••••••••' : 'https://… .ics'} value={cal ?? ''} onChange={(e) => setCal(e.target.value)} />
                 <button className="btn" onClick={() => { set({ calendarUrl: (cal ?? '').trim() }); setCal(null) }}>{s.calendarUrl && !cal ? 'Remove' : 'Save'}</button>
               </Row>
+              <Row title="Running light while music plays" desc="A light runs around the island's sides and bottom. Adaptive takes its colours from the album art."><Seg value={s.musicGlow} onChange={(v) => set({ musicGlow: v })} options={[['adaptive', 'Adaptive'], ['rainbow', 'Rainbow'], ['white', 'White'], ['off', 'Off']]} /></Row>
               <Row title="CPU, RAM and GPU" desc="Pick which usage numbers Kitty shows."><span className="minis">
                 {(['cpu', 'ram', 'gpu'] as const).map((k) => <label key={k}><Toggle on={s.stats[k]} onChange={(v) => set({ stats: { [k]: v } })} />{k.toUpperCase()}</label>)}
               </span></Row>

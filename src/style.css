@@ -361,3 +361,25 @@ button:focus-visible, [role='button']:focus-visible { outline: 2px solid #ffffff
 .chip-w, .chip-e { overflow: hidden; } .chip-w .dim, .chip-e .dim, .chip-e .ev { overflow: hidden; text-overflow: ellipsis; }
 .chip-e { flex-shrink: 1; justify-content: flex-end; }
 .strip .stat-bar { width: 26px; }
+
+/* ---- running light around the island while music plays (sides + bottom, the top edge stays dark) ---- */
+@property --run { syntax: '<angle>'; inherits: true; initial-value: 0deg; }
+.runlight { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 4;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, transparent 7px, #000 24px); mask-image: linear-gradient(to bottom, transparent 0, transparent 7px, #000 24px);
+  animation: runlight 3.4s linear infinite; }
+@keyframes runlight { to { --run: 360deg; } }
+.runlight .rl-ring { position: absolute; inset: 0; border-radius: inherit; padding: 2px; background: var(--comet);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+.runlight .rl-ring.soft { padding: 7px; filter: blur(7px); opacity: 0.75; }
+@media (prefers-reduced-motion: reduce) { .runlight { animation-duration: 12s !important; } }
+
+/* colourful music bars */
+.bars.on i[style] { filter: saturate(1.3); }
+
+/* focus card: the play / pause icon sits dead centre in its ring */
+.hc > .hc-ring { position: absolute; right: 12px; top: 10px; }
+.hc-ring > span { position: absolute; inset: 0; display: grid; place-items: center; }
+.hc-ring .lucide-play { margin-left: 3px; }
+
+/* the play/pause icon is not the ring: keep it in normal flow, centred */
+.hc-ring > span svg { position: static; }

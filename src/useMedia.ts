@@ -2,29 +2,48 @@ import { useEffect, useState } from 'react'
 
 const none: Media = { state: { active: false }, art: null, vol: null }
 
-// Average colour of the album art, used to tint the island
-function averageColor(src: string): Promise<string> {
+// Colourful default when a song has no artwork
+export const RAINBOW = ['#ff4d6d', '#ffb340', '#f9f871', '#4dffa6', '#4dc8ff', '#a66bff']
+
+type Look = { tint: string; palette: string[] }
+
+// From the album art: a dark average (to tint the island) and up to 4 vivid colours (for the running light and bars).
+// Pixels are grouped by hue; grey, very dark and washed-out pixels are ignored; the winners are pushed to "neon".
+function readArt(src: string): Promise<Look> {
   return new Promise((resolve) => {
     const img = new Image()
     img.onload = () => {
-      const c = document.createElement('canvas')
-      c.width = c.height = 8
-      const g = c.getContext('2d')!
-      g.drawImage(img, 0, 0, 8, 8)
-      const d = g.getImageData(0, 0, 8, 8).data
+      const S = 32, c = document.createElement('canvas'); c.width = c.height = S
+      const g = c.getContext('2d', { willReadFrequently: true })!
+      g.drawImage(img, 0, 0, S, S)
+      const d = g.getImageData(0, 0, S, S).data
       let r = 0, gr = 0, b = 0
-      for (let i = 0; i < d.length; i += 4) { r += d[i]; gr += d[i + 1]; b += d[i + 2] }
+      const bins: { w: number; h: number }[] = Array.from({ length: 12 }, () => ({ w: 0, h: 0 }))
+      for (let i = 0; i < d.length; i += 4) {
+        r += d[i]; gr += d[i + 1]; b += d[i + 2]
+        const R = d[i] / 255, G = d[i + 1] / 255, B = d[i + 2] / 255
+        const mx = Math.max(R, G, B), mn = Math.min(R, G, B), l = (mx + mn) / 2, ch = mx - mn
+        if (ch < 0.12 || l < 0.12 || l > 0.94) continue
+        const s = ch / (1 - Math.abs(2 * l - 1))
+        let h = mx === R ? ((G - B) / ch) % 6 : mx === G ? (B - R) / ch + 2 : (R - G) / ch + 4
+        h = (h * 60 + 360) % 360
+        const bin = bins[Math.floor(h / 30)]
+        bin.w += s; bin.h += h * s
+      }
       const n = d.length / 4
-      resolve(`rgb(${Math.round((r / n) * 0.75)}, ${Math.round((gr / n) * 0.75)}, ${Math.round((b / n) * 0.75)})`)
+      const palette = bins.map((x) => (x.w ? { w: x.w, h: x.h / x.w } : null)).filter(Boolean)
+        .sort((a, z) => z!.w - a!.w).slice(0, 4).filter((x) => x!.w > 3)
+        .map((x) => `hsl(${Math.round(x!.h)} 95% 62%)`)
+      resolve({ tint: `rgb(${Math.round((r / n) * 0.75)}, ${Math.round((gr / n) * 0.75)}, ${Math.round((b / n) * 0.75)})`, palette })
     }
-    img.onerror = () => resolve('')
+    img.onerror = () => resolve({ tint: '', palette: [] })
     img.src = src
   })
 }
 
 export function useMedia() {
   const [media, setMedia] = useState<Media>(none)
-  const [tint, setTint] = useState('')
+  const [look, setLook] = useState<Look>({ tint: '', palette: [] })
 
   useEffect(() => {
     window.kitty.media().then(setMedia)
@@ -33,9 +52,11 @@ export function useMedia() {
 
   const art = media.art
   useEffect(() => {
-    if (!art) { setTint(''); return }
-    averageColor(`data:${art.mime};base64,${art.data}`).then(setTint)
+    if (!art) { setLook({ tint: '', palette: [] }); return }
+    readArt(`data:${art.mime};base64,${art.data}`).then(setLook)
   }, [art?.data])
 
-  return { media, tint }
+  // at least two colours so the light always has something to run with
+  const palette = look.palette.length >= 2 ? look.palette : look.palette.length === 1 ? [look.palette[0], '#ffffff'] : RAINBOW
+  return { media, tint: look.tint, palette }
 }

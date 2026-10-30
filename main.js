@@ -267,14 +267,22 @@ ipcMain.on('chat:ask', (e, { id, prompt }) => {
   const dir = path.join(os.tmpdir(), 'kitty-chat')
   fs.mkdirSync(dir, { recursive: true })
   const p = spawn('claude', ['-p', '--output-format', 'text'], { cwd: dir, shell: true, windowsHide: true })
-  let err = ''
+  let err = '', out = ''
   p.stdout.setEncoding('utf8')
-  p.stdout.on('data', (d) => e.sender.send('chat:chunk', { id, text: d }))
+  p.stdout.on('data', (d) => { out += d; e.sender.send('chat:chunk', { id, text: d }) })
   p.stderr.on('data', (d) => { err += d })
-  p.on('error', (x) => e.sender.send('chat:done', { id, error: x.message }))
+  p.on('error', (x) => e.sender.send('chat:done', { id, error: x.message, clear: true }))
   p.on('close', (code) => {
-    if (code === 0) claude.bump('answers')
-    e.sender.send('chat:done', { id, error: code === 0 ? '' : (err.trim().slice(0, 200) || 'Claude Code could not answer. Is it installed and signed in?') })
+    if (code === 0) { claude.bump('answers'); return e.sender.send('chat:done', { id, error: '' }) }
+    // explain the common failures in plain words instead of showing raw CLI output (and hide other apps' hook noise)
+    const all = out + '\n' + err
+    const clean = err.split('\n').filter((l) => l.trim() && !/hook \[|hook failed|ECONNREFUSED/i.test(l)).join(' ').trim()
+    const error = /authenticat|oauth|not logged in|log ?in|unauthori[sz]ed|401/i.test(all)
+      ? "Claude Code's sign-in has expired. Open a terminal, run  claude  and type  /login , then ask again."
+      : /not recognized|ENOENT|command not found/i.test(all)
+        ? 'Claude Code is not installed (the claude command was not found).'
+        : clean.slice(0, 200) || 'Claude Code could not answer. Is it installed and signed in?'
+    e.sender.send('chat:done', { id, error, clear: true })
   })
   p.stdin.end(prompt)
 })

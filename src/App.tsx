@@ -10,6 +10,7 @@ import Music from './Music'
 import Claude from './Claude'
 import Chat from './Chat'
 import Bars from './Bars'
+import RunningLight from './RunningLight'
 import Battery from './Battery'
 import Stats, { statItems } from './Stats'
 import StatusDot from './StatusDot'
@@ -19,7 +20,7 @@ import Clipboard from './Clipboard'
 import Focus, { FocusState } from './Focus'
 import { wearing } from './catStyle'
 import { useClaude, lightState } from './useClaude'
-import { useMedia } from './useMedia'
+import { useMedia, RAINBOW } from './useMedia'
 import { useSettings, lights } from './useSettings'
 import { useUpdate, updateLabel } from './useUpdate'
 import { useInfo } from './useInfo'
@@ -49,7 +50,7 @@ export default function App() {
   const [volPop, setVolPop] = useState(false)
   const [hud, setHud] = useState<Hud>(null) // a quick status shown inside the collapsed notch
   const [tab, setTab] = useState<TabId>('home')
-  const { media, tint } = useMedia()
+  const { media, tint, palette } = useMedia()
   const hovered = useRef(false)
   const closeTimer = useRef<number | undefined>(undefined)
   const hudTimer = useRef<number | undefined>(undefined)
@@ -318,6 +319,7 @@ export default function App() {
           transition={spring}
           style={{ background: tab === 'music' && open && tint ? `linear-gradient(180deg, #000 30%, ${tint})` : '#000' }}
         >
+          {media.state.playing && settings.musicGlow !== 'off' && <RunningLight mode={settings.musicGlow} palette={settings.musicGlow === 'rainbow' ? RAINBOW : palette} />}
           <div className={'bar' + (hud && !open ? ' compact' : !open ? ' rest' : '')}>
             <span className="title">{leftIcons}{open && tab !== 'home' && <>{t1}<span style={{ color: cur.color }}>{t2}</span></>}</span>
             <span className="mid">
@@ -336,7 +338,7 @@ export default function App() {
                     {open && priv?.mic && <span className="pdot mic"><Mic size={11} /></span>}
                     {open && priv?.cam && <span className="pdot cam"><Video size={11} /></span>}
                     {light && <StatusDot color={light.color} kind={light.kind} />}
-                    {m.playing && <Bars color={TAN} active />}
+                    {m.playing && <Bars color={TAN} active colors={settings.musicGlow === 'adaptive' ? palette : RAINBOW} />}
                   </>}
               {open && <button className="dots" onClick={() => setMenu((x) => !x)} aria-label="Menu">{'•••'}{update.state === 'ready' && <i className="upd-dot" />}</button>}
             </span>

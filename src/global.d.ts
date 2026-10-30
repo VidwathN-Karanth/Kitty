@@ -13,7 +13,7 @@ type Settings = {
   bodyColor: string; eyeColor: string; outfit: string; seasonal: boolean
   lightPreset: string; lightWork: string; lightDone: string; lightError: string
   sounds: boolean; soundLevel: 'soft' | 'normal' | 'loud'; notifications: boolean; confetti: boolean; warnAt: number; usageBudget: number
-  speed: 'fast' | 'normal'; volumeBar: boolean; showBattery: boolean; batteryWarning: boolean; privacyDot: boolean; weatherCity: string; calendarUrl: string
+  musicGlow: 'adaptive' | 'rainbow' | 'white' | 'off'; speed: 'fast' | 'normal'; volumeBar: boolean; showBattery: boolean; batteryWarning: boolean; privacyDot: boolean; weatherCity: string; calendarUrl: string
   startWithWindows: boolean; testMode: boolean
   stats: { cpu: boolean; ram: boolean; gpu: boolean }; statsRest: boolean; statsOpen: boolean; peekOnQuestion: boolean
   shortcuts: Record<ShortcutKey, string>
@@ -52,7 +52,7 @@ interface Window {
     cli(): Promise<{ claude: boolean; codex: boolean }>
     chatAsk(id: number, prompt: string): void
     onChatChunk(cb: (m: { id: number; text: string }) => void): () => void
-    onChatDone(cb: (m: { id: number; error: string }) => void): () => void
+    onChatDone(cb: (m: { id: number; error: string; clear?: boolean }) => void): () => void
     settings(): Promise<Settings>
     setSettings(p: SettingsPatch): Promise<Settings>
     onSettings(cb: (s: Settings) => void): () => void

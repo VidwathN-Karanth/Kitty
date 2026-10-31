@@ -202,15 +202,9 @@ export const HAS_ART = !!ART.normal
 const wearFiles = import.meta.glob('./assets/wardrobe/*.png', { eager: true, query: '?url', import: 'default' }) as Record<string, string>
 const WEAR: Record<string, string> = Object.fromEntries(Object.entries(wearFiles).map(([k, v]) => [k.split('/').pop()!.replace('.png', ''), v]))
 
-// Where each wardrobe item sits on the artwork cat, in parts of the frame (ear tips at y 0.2, eyes at 0.52, chin
-// about 0.68): x and y of the anchor, width, and whether y is the item's bottom, centre or top.
-const PLACE: Record<string, [number, number, number, 'b' | 'c' | 't']> = {
-  wizard: [0.5, 0.33, 0.66, 'b'], tophat: [0.5, 0.31, 0.5, 'b'], beanie: [0.5, 0.47, 0.7, 'b'], crown: [0.5, 0.3, 0.4, 'b'],
-  party: [0.5, 0.29, 0.26, 'b'], chef: [0.5, 0.34, 0.5, 'b'], cowboy: [0.5, 0.34, 0.74, 'b'], flowers: [0.5, 0.26, 0.66, 'c'],
-  headphones: [0.5, 0.12, 0.84, 't'], halo: [0.5, 0.09, 0.46, 'c'], bow: [0.36, 0.25, 0.26, 'c'],
-  glasses: [0.5, 0.53, 0.6, 'c'], sunglasses: [0.5, 0.53, 0.6, 'c'], heartglasses: [0.5, 0.53, 0.6, 'c'],
-  bowtie: [0.5, 0.73, 0.28, 'c'], collar: [0.5, 0.64, 0.5, 't'], scarf: [0.5, 0.6, 0.62, 't'], bandana: [0.5, 0.62, 0.5, 't'],
-}
+// Kitty drawn wearing each outfit (blank eyes, lined up with "eyes-blank"; the frame has room for hats: half a
+// frame above and a quarter on each side). Sunglasses hide the pupils.
+const SHADES = new Set(['sunglasses', 'heartglasses'])
 
 // Look frames and their direction, used when there is no "eyes-blank" frame to draw moving pupils on.
 const LOOKS: [string, number, number][] = [['look-left', -1, 0], ['look-right', 1, 0], ['look-down', 0, 1], ['look-down-left', -0.72, 0.72], ['look-down-right', 0.72, 0.72]]
@@ -265,17 +259,21 @@ function ArtCat({ size, follow, mood, dance, outfit, blink, wave, eyes }: { size
   }, [blink])
 
   const calm = mood === 'normal'
-  const frame = wave && ART.wave ? 'wave' : calm && lid ? lid : calm && EYE_ART ? 'eyes-blank' : calm && dir ? dir : ART[mood] ? mood : 'normal'
+  const item = artOutfit(outfit), waving = wave && !!ART.wave
+  // dressed: shown on the bigger cat while it is calm (other faces show without the outfit; no blinking in it)
+  const dressed = size >= 60 && calm && !waving && EYE_ART && WEAR[item] ? WEAR[item] : null
+  const frame = dressed ? 'dressed' : waving ? 'wave' : calm && lid ? lid : calm && EYE_ART ? 'eyes-blank' : calm && dir ? dir : ART[mood] ? mood : 'normal'
+  const pupilsOn = frame === 'eyes-blank' || (frame === 'dressed' && !SHADES.has(item))
   // every frame we might show is stacked; only the current one is visible, so switching is a quick cross-fade
-  const layers = Array.from(new Set(['normal', ...(EYE_ART ? ['eyes-blank', 'blink', 'half-blink'] : LOOKS.map((l) => l[0])).filter((n) => ART[n]), frame]))
+  const layers = Array.from(new Set(['normal', ...(EYE_ART ? ['eyes-blank', 'blink', 'half-blink'] : LOOKS.map((l) => l[0])), frame].filter((n) => ART[n])))
   const img = { position: 'absolute', left: 0, top: -size * 0.1, width: size, height: size, objectFit: 'contain', userSelect: 'none', transition: 'opacity 90ms ease' } as const
-  const item = artOutfit(outfit), place = PLACE[item]
   return (
     <div ref={box} className={dance ? 'dance' : ''} style={{ position: 'relative', width: size, height: size * 0.8, flexShrink: 0 }}>
       <div ref={head} style={{ position: 'absolute', inset: 0, transition: 'transform 180ms cubic-bezier(.22,1,.36,1)', transformOrigin: '50% 80%' }}>
         {layers.map((n) => <img key={n} src={ART[n]} alt="" draggable={false} style={{ ...img, opacity: n === frame ? 1 : 0 }} />)}
+        {dressed && <img src={dressed} alt="" draggable={false} style={{ ...img, left: -size * 0.25, top: -size * 0.6, width: size * 1.5, height: size * 1.5 }} />}
         {EYE_ART && (
-          <svg viewBox={`0 0 ${size} ${size}`} style={{ position: 'absolute', left: 0, top: -size * 0.1, width: size, height: size, opacity: frame === 'eyes-blank' ? 1 : 0, transition: 'opacity 90ms ease', pointerEvents: 'none' }}>
+          <svg viewBox={`0 0 ${size} ${size}`} style={{ position: 'absolute', left: 0, top: -size * 0.1, width: size, height: size, opacity: pupilsOn ? 1 : 0, transition: 'opacity 90ms ease', pointerEvents: 'none' }}>
             {EYE_ART.map((e, i) => {
               const R = e.r * size
               return (
@@ -289,9 +287,6 @@ function ArtCat({ size, follow, mood, dance, outfit, blink, wave, eyes }: { size
               )
             })}
           </svg>
-        )}
-        {size >= 60 && place && WEAR[item] && (
-          <img src={WEAR[item]} alt="" draggable={false} style={{ position: 'absolute', left: (place[0] - place[2] / 2) * size, top: -size * 0.1 + place[1] * size, width: place[2] * size, transform: place[3] === 'b' ? 'translateY(-100%)' : place[3] === 'c' ? 'translateY(-50%)' : '', pointerEvents: 'none' }} />
         )}
       </div>
     </div>

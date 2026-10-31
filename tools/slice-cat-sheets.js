@@ -1,27 +1,28 @@
 // Turns the Gemini sprite sheets (see docs/CAT_ART_PROMPT.md) into the transparent frames Kitty uses.
 //
-//   npx electron tools/slice-cat-sheets.js art/v2
+//   npx electron tools/slice-cat-sheets.js art/v3
 //
-// The folder holds sheet1… sheet6 (PNG, JPG or WebP; the name only has to start with "sheetN"). For every sheet:
+// The folder holds sheet1-4 (faces) and sheet7-8 (dressed). PNG, JPG or WebP; the name only has to start with "sheetN". For every sheet:
 //   1. the little Gemini sparkle watermark in the bottom-right corner is painted out,
 //   2. the magenta background is keyed out (with edge clean-up), and grid lines / text labels are dropped,
 //   3. faces: every frame is scaled and moved so its ear tips land on the same spot as the "normal" face,
 //      so the cat doesn't jump when the face changes; sheets without the white sticker edge get one,
-//   4. wardrobe: each item is trimmed to its own size (the app places it on the head),
+//   4. dressed Kitty (wearing each outfit) is lined up by its eyes, with extra room above for tall hats,
 //   5. the eye whites of "eyes-blank" are measured, so the app can draw pupils that follow the mouse.
-// Faces go to src/assets/cat/, clothes to src/assets/wardrobe/, eye positions to src/assets/cat/eyes.json.
+// Faces go to src/assets/cat/, Kitty dressed in each outfit to src/assets/wardrobe/, eye positions to src/assets/cat/eyes.json.
 const { app, BrowserWindow } = require('electron')
 const fs = require('fs'), path = require('path'), os = require('os')
 
 // cols x rows, names left to right, top to bottom ('' = leave out). bottom: ignore everything below this
-// part of the cell (labels). edge: add the white sticker edge. item: wardrobe instead of faces.
+// part of the cell (labels). edge: add the white sticker edge. dressed: Kitty wearing clothes (blank eyes).
+// file: which sheet number in the folder (default: its place in this list).
 const SHEETS = [
   { cols: 3, rows: 3, bottom: 0.83, names: ['normal', 'blink', 'half-blink', 'look-left', 'look-right', 'look-down', 'look-down-left', 'look-down-right', 'eyes-blank'] },
   { cols: 3, rows: 3, names: ['happy', 'love', 'surprised', 'curious', 'focused', 'wink', 'sad', 'dizzy', 'sleepy'] },
   { cols: 3, rows: 3, edge: true, names: ['asleep', 'listening', 'angry', 'excited', 'crying', 'laugh', 'shy', 'smug', 'scared'] },
   { cols: 3, rows: 3, edge: true, names: ['bored', 'yawn', 'wave', 'purr', 'hungry', 'thinking', 'confused', 'proud', 'celebrate'] },
-  { cols: 3, rows: 3, item: true, names: ['wizard', 'tophat', 'beanie', 'crown', 'party', 'chef', 'flowers', 'headphones', 'halo'] },
-  { cols: 3, rows: 3, item: true, names: ['glasses', 'sunglasses', 'heartglasses', 'bowtie', 'scarf', 'collar', 'bow', 'bandana', 'cowboy'] },
+  { file: 7, cols: 3, rows: 3, dressed: true, names: ['bow', 'glasses', 'party', 'bowtie', 'beanie', 'collar', 'sunglasses', 'scarf', 'flowers'] },
+  { file: 8, cols: 3, rows: 3, dressed: true, names: ['headphones', 'chef', 'crown', 'heartglasses', 'bandana', 'tophat', 'cowboy', 'wizard', 'halo'] },
 ]
 const ROOT = path.join(__dirname, '..', 'src', 'assets')
 
@@ -50,9 +51,22 @@ const PAGE = `(async (sheets, cfg) => {
     }
   }
 
+  // dressed cells are one sticker (cat and outfit share the white edge): small bits of the next cell are dropped
+  function keepMain(p, w, h) {
+    const id = new Int32Array(w * h).fill(-1), size = []
+    for (let s = 0; s < w * h; s++) {
+      if (id[s] >= 0 || p[s * 4 + 3] < 128) continue
+      const c = size.length, st = [s]; id[s] = c; let n = 0
+      while (st.length) { const k = st.pop(), x = k % w; n++
+        for (const m of [k - 1, k + 1, k - w, k + w]) if (m >= 0 && m < w * h && id[m] < 0 && p[m * 4 + 3] >= 128 && Math.abs((m % w) - x) <= 1) { id[m] = c; st.push(m) } }
+      size.push(n)
+    }
+    const main = size.indexOf(Math.max(...size))
+    for (let k = 0; k < w * h; k++) if (id[k] >= 0 && id[k] !== main && size[id[k]] < size[main] * 0.05) p[k * 4 + 3] = 0 // a halo floating above stays
+  }
   const faces = {}, items = {}
   for (let s = 0; s < cfg.length; s++) {
-    const { cols, rows, names, bottom = 1, edge, item } = cfg[s]
+    const { cols, rows, names, bottom = 1, edge, dressed } = cfg[s]
     const img = await load(sheets[s])
     const W = img.width, H = img.height
     const sh = canvas(W, H), sg = sh.getContext('2d', { willReadFrequently: true }); sg.drawImage(img, 0, 0)
@@ -79,7 +93,7 @@ const PAGE = `(async (sheets, cfg) => {
       for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (x < m || y < m || x >= w - m || y >= h - m) p[(y * w + x) * 4 + 3] = 0
       clean(p, w, h)
       g.putImageData(d, 0, 0)
-      if (item) { items[name] = cv; return }
+      if (dressed) { keepMain(p, w, h); g.putImageData(d, 0, 0); items[name] = { cv, sheet: s }; return }
       // ear tips: the top fur pixel on each side of the head (fur = orange)
       // only the biggest patch of fur counts (orange confetti or stars floating around are not the head)
       const isFur = new Uint8Array(w * h)
@@ -135,34 +149,46 @@ const PAGE = `(async (sheets, cfg) => {
     dbg[name] = [f.sheet, f.hw, f.top, +k.toFixed(2), f.guess ? 'sheet median' : '']
   }
 
-  // eye whites of "eyes-blank": the two big, round, pure-white blobs inside the head
-  let eyes = null
-  if (out['eyes-blank']) {
-    const g = out['eyes-blank'].getContext('2d', { willReadFrequently: true }), p = g.getImageData(0, 0, S, S).data
+  // eye whites: the two big, round, pure-white blobs of about the same size, side by side
+  function findEyes(cv) {
+    const W = cv.width, H = cv.height, p = cv.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, W, H).data
     const white = (k) => p[k * 4 + 3] > 250 && p[k * 4] > 235 && p[k * 4 + 1] > 235 && p[k * 4 + 2] > 235
-    const seen = new Uint8Array(S * S), blobs = []
-    for (let s = 0; s < S * S; s++) {
+    const seen = new Uint8Array(W * H), blobs = []
+    for (let s = 0; s < W * H; s++) {
       if (seen[s] || !white(s)) continue
-      const st = [s]; seen[s] = 1; let n = 0, sx = 0, sy = 0, x0 = S, x1 = 0, y0 = S, y1 = 0
-      while (st.length) { const k = st.pop(), x = k % S, y = (k / S) | 0; n++; sx += x; sy += y; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y
-        for (const m of [k - 1, k + 1, k - S, k + S]) if (m >= 0 && m < S * S && !seen[m] && white(m) && Math.abs((m % S) - x) <= 1) { seen[m] = 1; st.push(m) } }
+      const st = [s]; seen[s] = 1; let n = 0, sx = 0, sy = 0, x0 = W, x1 = 0, y0 = H, y1 = 0
+      while (st.length) { const k = st.pop(), x = k % W, y = (k / W) | 0; n++; sx += x; sy += y; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y
+        for (const m of [k - 1, k + 1, k - W, k + W]) if (m >= 0 && m < W * H && !seen[m] && white(m) && Math.abs((m % W) - x) <= 1) { seen[m] = 1; st.push(m) } }
       const bw = x1 - x0, bh = y1 - y0
-      if (n > 400 && bw < S * 0.3 && bh < S * 0.3 && Math.abs(bw - bh) < Math.max(bw, bh) * 0.35 && n > bw * bh * 0.6) blobs.push({ x: sx / n, y: sy / n, r: (bw + bh) / 4, n })
+      if (bw > W * 0.04 && bw < W * 0.3 && bh < W * 0.3 && Math.abs(bw - bh) < Math.max(bw, bh) * 0.35 && n > bw * bh * 0.6) blobs.push({ x: sx / n, y: sy / n, r: (bw + bh) / 4 })
     }
-    blobs.sort((a, b) => b.n - a.n)
-    if (blobs.length >= 2) eyes = blobs.slice(0, 2).sort((a, b) => a.x - b.x).map((b) => ({ x: +(b.x / S).toFixed(4), y: +(b.y / S).toFixed(4), r: +(b.r / S).toFixed(4) }))
+    let best = null, cost = Infinity    // the pair that looks most like two eyes (same height, same size, near the middle)
+    for (const a of blobs) for (const b of blobs) if (a.x < b.x) {
+      const c = Math.abs(a.y - b.y) + Math.abs(a.r - b.r) * 2 + Math.abs((a.x + b.x) / 2 - W / 2) * 0.5
+      if (c < cost && b.x - a.x > a.r * 2.5) { cost = c; best = [a, b] }
+    }
+    return best
   }
+  const blank = out['eyes-blank'] && findEyes(out['eyes-blank'])
+  const eyes = blank && blank.map((b) => ({ x: +(b.x / S).toFixed(4), y: +(b.y / S).toFixed(4), r: +(b.r / S).toFixed(4) }))
 
-  // wardrobe: trimmed to the item, at most 512 on the long side
+  // dressed Kitty: lined up by the eyes (hats hide the top of the head) so its eyes land exactly on the
+  // blank-eyes frame's, where the app draws the pupils. The frame has room around it (half a frame above, a
+  // quarter on each side) for tall hats and wide brims.
+  // Sunglasses hide the eyes: those frames use their sheet's usual size and spot.
   const wear = {}
-  for (const [name, cv] of Object.entries(items)) {
-    const g = cv.getContext('2d', { willReadFrequently: true }), p = g.getImageData(0, 0, cv.width, cv.height).data
-    let x0 = cv.width, x1 = 0, y0 = cv.height, y1 = 0
-    for (let k = 0; k < cv.width * cv.height; k++) if (p[k * 4 + 3] > 20) { const x = k % cv.width, y = (k / cv.width) | 0; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y }
-    const w = x1 - x0 + 1, h = y1 - y0 + 1, k = Math.min(1, S / Math.max(w, h))
-    const o = canvas(Math.round(w * k), Math.round(h * k)), og = o.getContext('2d'); og.imageSmoothingQuality = 'high'
-    og.drawImage(cv, x0, y0, w, h, 0, 0, o.width, o.height)
-    wear[name] = o.toDataURL('image/png').split(',')[1]
+  if (eyes) {
+    const ex = (eyes[0].x + eyes[1].x) / 2 * S, ey = (eyes[0].y + eyes[1].y) / 2 * S, ed = (eyes[1].x - eyes[0].x) * S
+    const fit = {}
+    for (const [name, it] of Object.entries(items)) { const e = findEyes(it.cv); if (e) fit[name] = { k: ed / (e[1].x - e[0].x), mx: (e[0].x + e[1].x) / 2, my: (e[0].y + e[1].y) / 2 } }
+    for (const [name, it] of Object.entries(items)) {
+      let f = fit[name]
+      if (!f) { const same = Object.keys(items).filter((n) => items[n].sheet === it.sheet && fit[n]).map((n) => fit[n]); f = { k: median(same.map((g) => g.k)), mx: median(same.map((g) => g.mx)), my: median(same.map((g) => g.my)) } }
+      const o = canvas(S * 1.5, S * 1.5), g = o.getContext('2d'); g.imageSmoothingQuality = 'high'
+      g.drawImage(it.cv, S / 4 + ex - f.mx * f.k, S / 2 + ey - f.my * f.k, it.cv.width * f.k, it.cv.height * f.k)
+      wear[name] = o.toDataURL('image/png').split(',')[1]
+      dbg['wear-' + name] = [+f.k.toFixed(2), fit[name] ? 'eyes' : 'sheet median']
+    }
   }
   const png = {}; for (const [n, c] of Object.entries(out)) png[n] = c.toDataURL('image/png').split(',')[1]
   return { png, wear, eyes, dbg }
@@ -171,8 +197,8 @@ const PAGE = `(async (sheets, cfg) => {
 app.setPath('userData', path.join(os.tmpdir(), 'kitty-slicer'))
 app.whenReady().then(async () => {
   const dir = process.argv.slice(2).find((a) => !a.startsWith('-'))
-  const files = dir && fs.existsSync(dir) ? SHEETS.map((_, i) => fs.readdirSync(dir).find((f) => f.toLowerCase().startsWith('sheet' + (i + 1)))) : []
-  if (files.length !== SHEETS.length || files.some((f) => !f)) { console.log('Usage: npx electron tools/slice-cat-sheets.js <folder with sheet1 … sheet6>'); return app.exit(1) }
+  const files = dir && fs.existsSync(dir) ? SHEETS.map((c, i) => fs.readdirSync(dir).find((f) => f.toLowerCase().startsWith('sheet' + (c.file ?? i + 1)))) : []
+  if (files.length !== SHEETS.length || files.some((f) => !f)) { console.log('Usage: npx electron tools/slice-cat-sheets.js <folder with sheet1-4, sheet7, sheet8>'); return app.exit(1) }
   const mime = (f) => ({ jpg: 'jpeg', jpeg: 'jpeg', webp: 'webp', png: 'png' }[path.extname(f).slice(1).toLowerCase()] || 'png')
   const sheets = files.map((f) => `data:image/${mime(f)};base64,` + fs.readFileSync(path.join(dir, f)).toString('base64'))
   const win = new BrowserWindow({ show: false })
@@ -186,6 +212,6 @@ app.whenReady().then(async () => {
   for (const [n, b] of Object.entries(res.wear)) fs.writeFileSync(path.join(wear, n + '.png'), Buffer.from(b, 'base64'))
   if (res.eyes) fs.writeFileSync(path.join(cat, 'eyes.json'), JSON.stringify(res.eyes))
   if (process.env.SLICE_DEBUG) for (const [n, d] of Object.entries(res.dbg)) console.log(n.padEnd(16), JSON.stringify(d))
-  console.log(`${Object.keys(res.png).length} faces, ${Object.keys(res.wear).length} wardrobe items, eyes: ${res.eyes ? JSON.stringify(res.eyes) : 'NOT FOUND'}`)
+  console.log(`${Object.keys(res.png).length} faces, ${Object.keys(res.wear).length} dressed, eyes: ${res.eyes ? JSON.stringify(res.eyes) : 'NOT FOUND'}`)
   app.exit(res.eyes ? 0 : 2)
 })

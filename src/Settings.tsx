@@ -291,7 +291,7 @@ export default function SettingsApp() {
         {page === 'kitty' && (
           <>
             <div className="hero">
-              <Cat size={150} follow={false} mood={preview ?? 'happy'} blink={s.blinking} {...look} />
+              <Cat size={150} follow={false} mood={preview ?? 'normal'} blink={s.blinking} {...look} />
               <div style={{ flex: 1 }}>
                 <h2>{s.name}</h2>
                 <p>{st.total} tasks done · {earned} of 12 badges</p>
@@ -353,7 +353,7 @@ export default function SettingsApp() {
         {page === 'wardrobe' && (
           <div className="wardrobe">
             <div className="stagecard">
-              <Cat size={210} follow={false} mood="happy" blink={s.blinking} {...look} />
+              <Cat size={210} follow={false} mood="normal" blink={s.blinking} {...look} />
               <b>{s.name}</b><small>Wearing: {outfit === 'none' ? 'nothing' : outfit}</small>
             </div>
             <div>

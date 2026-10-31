@@ -125,3 +125,88 @@ THE 9 CELLS (left to right, top to bottom)
   differences are fixed automatically. Big differences in head shape or a body can't be fixed afterwards.
 - **Eyes and wardrobe:** sheet 1 (normal, blinks, look directions, blank eyes) and sheets 5–6 (wardrobe) from
   `art/v2` are kept as they are.
+
+---
+
+# Dressed Kitty: the cat drawn wearing each wardrobe item
+
+Clothes cut out on their own never sit quite right on the head. These two sheets have Gemini draw Kitty already
+wearing each item. The eyes are left blank white, so Kitty still draws its own pupils that follow the mouse.
+
+## How to do it
+
+1. Open a **new** Gemini chat. Attach **`art/kitty-reference-blank.png`** and paste **Message 4**. Save the result as
+   `sheet7.png`.
+2. In the **same chat**, attach the same picture again and paste **Message 5**. Save it as `sheet8.png`.
+3. If one cell drifts, reply: *"Cell N doesn't match the reference. Redraw only that cell with exactly the same
+   head as the attached image, then give me the full 3x3 sheet again."*
+4. Put both in `art/v3/` next to the others and send them to me.
+
+## Message 4 (attach `art/kitty-reference-blank.png`)
+
+```
+The attached image is "Kitty", a mascot cat, with blank white eyes. I need a 3 x 3 sheet of Kitty wearing
+different clothes and accessories.
+
+KITTY MUST LOOK EXACTLY LIKE THE ATTACHED IMAGE IN ALL 9 CELLS. Copy it; do not redesign it.
+- Same head shape, same ears, same fur colour and stripes, same cream muzzle, same pink nose, same small "w" mouth,
+  same thin dark-brown outline.
+- Keep the EYES EXACTLY AS IN THE IMAGE: two plain white circles with a dark-brown outline, with NO iris, NO pupil
+  and NO highlight (an app draws the pupils later). Do not close or change the eyes.
+- HEAD ONLY, plus a little cream chest fluff just under the chin for neckwear to sit on. No body, no arms.
+- The thick white sticker edge goes around the cat AND the item together, as one sticker.
+
+HOW THE ITEMS ARE WORN (very important)
+- Each item is worn naturally, like a real cat wearing it, made to fit THIS head: the right size for the head,
+  sitting on it (not floating above it, not pasted on top), following the curve of the head.
+- Hats sit snugly on top of the head. A hat either sits between the ears or covers them, as it naturally would;
+  where an ear goes over or under the hat, draw it that way. Hats never cover the eyes.
+- Glasses rest on the face in front of the eyes, centred on them, with the arms going back behind the cheeks.
+- Neckwear wraps around the neck just under the chin.
+- Same flat, clean sticker style, colours and outline as Kitty. The item must look like part of the same drawing.
+
+LAYOUT (a script cuts this image automatically, so follow it exactly)
+- One SQUARE image, 2048 x 2048 if possible, split into a 3 x 3 grid of 9 equal square cells.
+- In every cell the head is the SAME SIZE and in the SAME PLACE: centred, the head about 50% of the cell wide,
+  the chin at about 80% from the top of the cell, so there is room above the head for tall hats.
+  Do not make some heads bigger or smaller, and never shrink or move the head to fit a hat.
+- Everything stays inside its own cell with some magenta margin around it.
+- Background everywhere: one flat solid pure magenta #FF00FF. No gradient, no shadow, no floor.
+- NO text, NO labels, NO numbers, NO grid lines, NO borders between the cells.
+- Never use magenta, purple or pink-purple on the cat or the items.
+
+THE 9 CELLS (left to right, top to bottom)
+1. a big red satin hair bow, worn on top of the head, a little to the left, between the ears.
+2. thin gold round glasses with clear lenses (the white eyes show through the lenses).
+3. a teal-and-yellow striped party cone hat with a red pom-pom, sitting on top of the head between the ears.
+4. a red bow tie with white polka dots, under the chin.
+5. a knitted mustard-yellow beanie with a fluffy cream pom-pom, pulled snugly over the top of the head;
+   the ears poke out through two little holes on top.
+6. a red leather collar with a shiny gold bell at the front, under the chin.
+7. black rectangular sunglasses with a white shine streak, covering both eyes.
+8. a chunky green-and-cream striped knitted scarf wrapped around the neck, one end hanging down the front.
+9. a crown of small white daisies, yellow buttercups and green leaves, resting on top of the head around the
+   base of the ears.
+```
+
+## Message 5 (same chat, attach `art/kitty-reference-blank.png` again)
+
+```
+Great. Now the next 3 x 3 sheet with exactly the same rules as before: Kitty must look EXACTLY like the attached
+image in every cell (same head, same blank white eyes with no pupils, same "w" mouth, head only with a little chest
+fluff), each item worn naturally and made to fit the head, one white sticker edge around cat and item together,
+the head the same size and in the same place in every cell (about 50% of the cell wide, chin at about 80% from the
+top), flat magenta #FF00FF background, no text, no labels, no grid lines.
+
+THE 9 CELLS (left to right, top to bottom)
+1. big white over-ear headphones with an orange band: the band goes over the top of the head between the ears,
+   and the round ear cups sit on the sides of the head.
+2. a tall white puffy chef hat sitting snugly on top of the head.
+3. a small gold crown with red and blue gems, sitting on top of the head between the ears.
+4. red heart-shaped sunglasses covering both eyes.
+5. a blue paisley bandana tied around the neck, knot at the front.
+6. a black silk top hat with a red ribbon band, sitting on top of the head between the ears, slightly tilted.
+7. a brown leather cowboy hat with a stitched band, sitting on the head; the ears are under the brim.
+8. a tall deep-blue pointed wizard hat with gold stars and moons and a floppy tip, sitting on the head.
+9. a glowing golden halo floating just above the head, with a soft light-yellow glow (no pink or purple in it).
+```

@@ -53,7 +53,7 @@ html, body, #root { margin: 0; height: 100%; background: transparent; overflow: 
 
 .drop { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; height: 150px; margin-top: 8px; border: 2px dashed #444; border-radius: 22px; color: #888; font-size: 14px; }
 .drop b { color: #fff; font-size: 17px; }
-.drop.mini { height: 64px; width: 150px; margin: 0; font-size: 13px; }
+.drop.mini { height: auto; width: 140px; margin: 0; padding: 0 12px; box-sizing: border-box; font-size: 13px; text-align: center; border-radius: 16px; } /* same height as the file tiles beside it */
 .files { display: flex; flex-wrap: wrap; gap: 10px; padding-top: 8px; }
 .file { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; width: 92px; padding: 10px 6px; border-radius: 16px; background: #141416; cursor: grab; font-size: 12px; }
 .file span { max-width: 84px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -142,7 +142,7 @@ html, body, #root { margin: 0; height: 100%; background: transparent; overflow: 
 .vol input { -webkit-appearance: none; appearance: none; width: 150px; height: 6px; border-radius: 3px; outline: 0; cursor: pointer;
   background: linear-gradient(90deg, #fff var(--p), #3a3a3c var(--p)); }
 .vol input::-webkit-slider-thumb { -webkit-appearance: none; width: 0; height: 0; }
-.vol.wide { padding: 10px 12px 8px; } .vol.wide input { flex: 1; width: auto; }
+.vol.wide { padding: 10px 12px 8px; } .vol.wide input { flex: 1; width: auto; min-width: 0; } /* fits whatever room the menu has */
 
 /* cat music animations */
 .sing { transform-box: fill-box; transform-origin: center; animation: sing 0.55s ease-in-out infinite alternate; }
@@ -418,3 +418,6 @@ button:focus-visible, [role='button']:focus-visible { outline: 2px solid #ffffff
 .menu { width: 236px; max-height: 250px; overflow-y: auto; scrollbar-width: none; }
 .menu button, .menu .err { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .menu button { flex-shrink: 0; }
+
+/* speaker status in the resting notch, left of CPU */
+.spk { display: inline-grid; place-items: center; color: #9a9ca3; }

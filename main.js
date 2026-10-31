@@ -50,6 +50,7 @@ function create() {
   })
   win.setAlwaysOnTop(true, 'screen-saver')
   win.setIgnoreMouseEvents(true, { forward: true })
+  win.setContentProtection(true) // left out of screenshots, screen recordings and screen sharing
   // Other "always on top" windows (fullscreen apps, players, popups) can still land above the island. Take the top
   // spot back right away when that happens, and check again every second (moveTop never steals the keyboard focus).
   const home = { width: W, height: H, x: Math.round(x + (width - W) / 2), y: 0 }

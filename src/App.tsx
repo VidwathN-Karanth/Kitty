@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Settings as Gear, Volume2, VolumeX, Plane, Mic, Video, LayoutGrid, Ellipsis } from 'lucide-react'
+import { Settings as Gear, Volume as Volume0, Volume1, Volume2, VolumeX, Plane, Mic, Video, LayoutGrid, Ellipsis } from 'lucide-react'
 import { TABS, TabId } from './tabs'
 import Home from './Home'
 import Cat, { Mood } from './Cat'
@@ -311,6 +311,9 @@ export default function App() {
   const [t1, t2] = cur.id === 'chat' ? [`${settings.name} `, 'Chat'] : cur.title
   const priv = settings.privacyDot ? media.priv : undefined
   const volIcon = media.vol?.mute || !media.vol?.v ? <VolumeX size={18} /> : <Volume2 size={18} />
+  // the speaker in the resting notch shows the level: muted, off, low, high
+  const lv = media.vol?.mute ? -1 : media.vol?.v ?? 0
+  const speaker = lv < 0 ? <VolumeX size={15} /> : lv === 0 ? <Volume0 size={15} /> : lv < 0.5 ? <Volume1 size={15} /> : <Volume2 size={15} />
 
   // Resting notch is only as wide as what it shows: the cat in the middle, and the wider of the two sides on both sides
   const leftEl = useRef<HTMLSpanElement>(null), rightEl = useRef<HTMLSpanElement>(null)
@@ -356,7 +359,7 @@ export default function App() {
   const leftIcons = !open && (
     hud === 'vol' ? volIcon
       : hud === 'air' ? <Plane size={17} color="#ffb04a" />
-      : <>{settings.statsRest && <Stats s={sys} on={settings.stats} compact />}{air && <Plane size={16} color="#ffb04a" />}{priv?.mic && <span className="pdot mic"><Mic size={11} /></span>}{priv?.cam && <span className="pdot cam"><Video size={11} /></span>}</>
+      : <>{media.vol && <span className="spk">{speaker}</span>}{settings.statsRest && <Stats s={sys} on={settings.stats} compact />}{air && <Plane size={16} color="#ffb04a" />}{priv?.mic && <span className="pdot mic"><Mic size={11} /></span>}{priv?.cam && <span className="pdot cam"><Video size={11} /></span>}</>
   )
 
   return (

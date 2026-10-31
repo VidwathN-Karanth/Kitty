@@ -25,7 +25,9 @@ public static class WinDrag {
         if (now && (!down || fg != w)) { w = fg; GetWindowRect(w, out r0); }
         else if (now && !drag) {
           RECT r; IntPtr f = fg;
-          if (f == w && GetWindowRect(f, out r) && (Math.Abs(r.L - r0.L) > 6 || Math.Abs(r.T - r0.T) > 6) && r.R - r.L == r0.R - r0.L) {
+          // moved as a whole: both left and right edges (or top and bottom) shifted. A resize moves only one edge; a
+          // maximized or full-screen window shrinks back as it is dragged, so its size is not compared
+          if (f == w && GetWindowRect(f, out r) && ((Math.Abs(r.L - r0.L) > 6 && Math.Abs(r.R - r0.R) > 6) || (Math.Abs(r.T - r0.T) > 6 && Math.Abs(r.B - r0.B) > 6))) {
             drag = true; Console.Out.WriteLine("{\"type\":\"windrag\",\"on\":true}"); Console.Out.Flush();
           }
         } else if (!now && drag) { drag = false; Console.Out.WriteLine("{\"type\":\"windrag\",\"on\":false}"); Console.Out.Flush(); }

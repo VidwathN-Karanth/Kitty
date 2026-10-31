@@ -372,13 +372,24 @@ export default function App() {
     light: light ? <StatusDot color={light.color} kind={light.kind} /> : null,
     bars: m.playing ? <Bars color={TAN} active colors={settings.musicGlow === 'adaptive' ? palette : RAINBOW} /> : null,
   }
+  // Calm, not jumpy: widths only ever grow (CPU going from 9% to 12% must not tip the balance back and forth), and
+  // the arrangement is only worked out again when an item comes or goes, the layout setting changes, or an item got
+  // clearly wider. Otherwise everything stays exactly where it is.
   const widths = useRef<Partial<Record<NotchItem, number>>>({})
-  const [, remeasured] = useState(0)
-  const side = arrange(settings, (Object.keys(items) as NotchItem[]).filter((k) => items[k]), (k) => widths.current[k] ?? NOTCH_ITEMS[k].w)
-  useLayoutEffect(() => { // learn the real widths; arrange again when one changes
-    let changed = false
-    document.querySelectorAll<HTMLElement>('.bar [data-k]').forEach((el) => { const k = el.dataset.k as NotchItem; if (Math.abs((widths.current[k] ?? 0) - el.offsetWidth) > 2) { widths.current[k] = el.offsetWidth; changed = true } })
-    if (changed) remeasured((n) => n + 1)
+  const [grew, setGrew] = useState(0)
+  const present = (Object.keys(items) as NotchItem[]).filter((k) => items[k])
+  const layoutKey = [settings.notchMode, settings.notchLeft.join(), settings.notchRight.join(), present.join(), grew].join('|')
+  const laidOut = useRef<{ key: string; side: { left: NotchItem[]; right: NotchItem[] } } | null>(null)
+  if (laidOut.current?.key !== layoutKey) laidOut.current = { key: layoutKey, side: arrange(settings, present, (k) => widths.current[k] ?? NOTCH_ITEMS[k].w) }
+  const side = laidOut.current.side
+  useLayoutEffect(() => { // learn the real widths
+    let bigger = false
+    document.querySelectorAll<HTMLElement>('.bar [data-k]').forEach((el) => {
+      const k = el.dataset.k as NotchItem, w = el.offsetWidth
+      if (widths.current[k] === undefined || w > widths.current[k]! + 8) { widths.current[k] = w; bigger = true }
+      else if (w > widths.current[k]!) widths.current[k] = w // a little wider: remember it, no rearranging for that
+    })
+    if (bigger) setGrew((n) => n + 1)
   })
   const place = (l: NotchItem[]) => l.map((k) => <span key={k} data-k={k} className="ni">{items[k]}</span>)
 

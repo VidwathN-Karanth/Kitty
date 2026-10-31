@@ -328,7 +328,11 @@ export default function SettingsApp() {
             <Group title="Behaviour">
               <Row title="Faces" desc="Happy, sad, curious, focused and more. Off = plain eyes."><Toggle on={s.faces} onChange={(v) => set({ faces: v })} /></Row>
               <div className="row col"><div><b>See emotions</b><p>Click one to see it.</p></div>
-                <div className="emos">{EMOTIONS.map(([m, e, l]) => <button key={m} className={preview === m ? 'on' : ''} onClick={() => { setPreview(m); setTimeout(() => setPreview((p) => (p === m ? null : p)), 3500) }}>{e} {l}</button>)}</div>
+                <div className="emos">{EMOTIONS.map(([m, e, l]) => <button key={m} className={preview === m ? 'on' : ''} onClick={() => {
+                  setPreview(m); setTimeout(() => setPreview((p) => (p === m ? null : p)), 3500)
+                  window.kitty.testRun('mood:' + m)                                                       // the island's cat shows it too
+                  document.querySelector('.hero')?.scrollIntoView({ block: 'center' }) // and the big cat comes into view
+                }}>{e} {l}</button>)}</div>
               </div>
               <Row title="Blinking" desc="The cat blinks now and then."><Toggle on={s.blinking} onChange={(v) => set({ blinking: v })} /></Row>
               <Row title="Eyes follow the cursor" desc="The cat looks at your mouse, anywhere on screen."><Toggle on={s.follow} onChange={(v) => set({ follow: v })} /></Row>

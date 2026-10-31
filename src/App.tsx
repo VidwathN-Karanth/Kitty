@@ -266,6 +266,7 @@ export default function App() {
     else if (kind === 'hi') flash('hi', 2800)
     else if (kind === 'confetti') { confetti(); showMood('celebrate', 4000) }
     else if (kind === 'usage') { showMood('scared', 4000); peek(5000) }
+    else if (kind.startsWith('mood:')) showMood(kind.slice(5) as Mood, 3500) // "See emotions" in Settings
   }), [])
 
   // --- mood: demo > Claude's state > startup greeting > app trick > music > sleep > hunger ---
@@ -369,7 +370,7 @@ export default function App() {
             <span className="mid">
               <span className="pet" onMouseMove={pet}>
                 {hearts.map((h) => <i key={h.id} className="heart" style={{ ['--hx' as string]: h.x + 'px' }}>♥</i>)}
-              <Cat size={34} follow={settings.follow} light={light?.color} mood={mood} dance={dance} blink={settings.blinking} wave={hud === 'hi'} body={look.body} eyes={look.eyes} />
+              <Cat size={34} follow={settings.follow} light={light?.color} mood={mood} dance={dance} blink={settings.blinking} wave={hud === 'hi'} body={look.body} eyes={look.eyes} outfit={look.outfit} />
               </span>
               {open && settings.showBattery && laptop && <Battery level={laptop.level} charging={laptop.charging} />}
               {open && settings.apps.clock && <span className="clock">{date} <b>{time}</b></span>}

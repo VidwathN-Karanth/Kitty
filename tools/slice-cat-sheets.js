@@ -9,7 +9,8 @@
 //      so the cat doesn't jump when the face changes; sheets without the white sticker edge get one,
 //   4. dressed Kitty (wearing each outfit) is lined up by its eyes, with extra room above for tall hats,
 //   5. the eye whites of "eyes-blank" are measured, so the app can draw pupils that follow the mouse.
-// Faces go to src/assets/cat/, Kitty dressed in each outfit to src/assets/wardrobe/, eye positions to src/assets/cat/eyes.json.
+// Faces go to src/assets/cat/, Kitty dressed in each outfit to src/assets/wardrobe/ (with tops.json: how high each
+// outfit reaches), eye positions to src/assets/cat/eyes.json.
 const { app, BrowserWindow } = require('electron')
 const fs = require('fs'), path = require('path'), os = require('os')
 
@@ -176,7 +177,7 @@ const PAGE = `(async (sheets, cfg) => {
   // blank-eyes frame's, where the app draws the pupils. The frame has room around it (half a frame above, a
   // quarter on each side) for tall hats and wide brims.
   // Sunglasses hide the eyes: those frames use their sheet's usual size and spot.
-  const wear = {}
+  const wear = {}, tops = {}
   if (eyes) {
     const ex = (eyes[0].x + eyes[1].x) / 2 * S, ey = (eyes[0].y + eyes[1].y) / 2 * S, ed = (eyes[1].x - eyes[0].x) * S
     const fit = {}
@@ -187,11 +188,16 @@ const PAGE = `(async (sheets, cfg) => {
       const o = canvas(S * 1.5, S * 1.5), g = o.getContext('2d'); g.imageSmoothingQuality = 'high'
       g.drawImage(it.cv, S / 4 + ex - f.mx * f.k, S / 2 + ey - f.my * f.k, it.cv.width * f.k, it.cv.height * f.k)
       wear[name] = o.toDataURL('image/png').split(',')[1]
+      // how high the outfit reaches (top of the drawing, in frames from the top of this taller frame), so the
+      // small cat in the notch can shrink just enough for a hat to fit
+      const a = g.getImageData(0, 0, o.width, o.height).data
+      let t = 0; while (t < o.height && !a.slice(t * o.width * 4, (t + 1) * o.width * 4).some((v, i) => i % 4 === 3 && v > 60)) t++
+      tops[name] = +(t / S).toFixed(3)
       dbg['wear-' + name] = [+f.k.toFixed(2), fit[name] ? 'eyes' : 'sheet median']
     }
   }
   const png = {}; for (const [n, c] of Object.entries(out)) png[n] = c.toDataURL('image/png').split(',')[1]
-  return { png, wear, eyes, dbg }
+  return { png, wear, eyes, dbg, tops }
 })`
 
 app.setPath('userData', path.join(os.tmpdir(), 'kitty-slicer'))
@@ -211,6 +217,7 @@ app.whenReady().then(async () => {
   for (const [n, b] of Object.entries(res.png)) fs.writeFileSync(path.join(cat, n + '.png'), Buffer.from(b, 'base64'))
   for (const [n, b] of Object.entries(res.wear)) fs.writeFileSync(path.join(wear, n + '.png'), Buffer.from(b, 'base64'))
   if (res.eyes) fs.writeFileSync(path.join(cat, 'eyes.json'), JSON.stringify(res.eyes))
+  fs.writeFileSync(path.join(wear, 'tops.json'), JSON.stringify(res.tops))
   if (process.env.SLICE_DEBUG) for (const [n, d] of Object.entries(res.dbg)) console.log(n.padEnd(16), JSON.stringify(d))
   console.log(`${Object.keys(res.png).length} faces, ${Object.keys(res.wear).length} dressed, eyes: ${res.eyes ? JSON.stringify(res.eyes) : 'NOT FOUND'}`)
   app.exit(res.eyes ? 0 : 2)

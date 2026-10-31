@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import Outfits from './Outfits'
 import { bodyColor, eyeColor, Outfit, artOutfit } from './catStyle'
 import EYE_SPOTS from './assets/cat/eyes.json'
+import WEAR_TOPS from './assets/wardrobe/tops.json'
 
 export type Mood =
   | 'normal' | 'happy' | 'love' | 'surprised' | 'curious' | 'focused' | 'wink' | 'sad' | 'dizzy' | 'sleepy' | 'asleep'
@@ -205,6 +206,10 @@ const WEAR: Record<string, string> = Object.fromEntries(Object.entries(wearFiles
 // Kitty drawn wearing each outfit (blank eyes, lined up with "eyes-blank"; the frame has room for hats: half a
 // frame above and a quarter on each side). Sunglasses hide the pupils.
 const SHADES = new Set(['sunglasses', 'heartglasses'])
+// In the notch the cat touches the top of the screen: a hat that reaches higher than the ears makes the small cat
+// shrink a little (around its chin) until the hat fits. tops: how high each outfit reaches in its frame.
+const TOPS = WEAR_TOPS as Record<string, number>
+const notchFit = (item: string) => Math.min(1, 0.64 / (1.18 - (TOPS[item] ?? 0.67)))
 
 // Look frames and their direction, used when there is no "eyes-blank" frame to draw moving pupils on.
 const LOOKS: [string, number, number][] = [['look-left', -1, 0], ['look-right', 1, 0], ['look-down', 0, 1], ['look-down-left', -0.72, 0.72], ['look-down-right', 0.72, 0.72]]
@@ -260,8 +265,10 @@ function ArtCat({ size, follow, mood, dance, outfit, blink, wave, eyes }: { size
 
   const calm = mood === 'normal'
   const item = artOutfit(outfit), waving = wave && !!ART.wave
-  // dressed: shown on the bigger cat while it is calm (other faces show without the outfit; no blinking in it)
-  const dressed = size >= 60 && calm && !waving && EYE_ART && WEAR[item] ? WEAR[item] : null
+  // dressed: shown while the cat is calm, listening to music or watching Claude work (other faces show without the
+  // outfit, and it doesn't blink in it)
+  const dressed = (calm || mood === 'listening' || mood === 'focused') && !waving && EYE_ART && WEAR[item] ? WEAR[item] : null
+  const fit = dressed && size < 60 ? notchFit(item) : 1
   const frame = dressed ? 'dressed' : waving ? 'wave' : calm && lid ? lid : calm && EYE_ART ? 'eyes-blank' : calm && dir ? dir : ART[mood] ? mood : 'normal'
   const pupilsOn = frame === 'eyes-blank' || (frame === 'dressed' && !SHADES.has(item))
   // every frame we might show is stacked; only the current one is visible, so switching is a quick cross-fade
@@ -270,6 +277,7 @@ function ArtCat({ size, follow, mood, dance, outfit, blink, wave, eyes }: { size
   return (
     <div ref={box} className={dance ? 'dance' : ''} style={{ position: 'relative', width: size, height: size * 0.8, flexShrink: 0 }}>
       <div ref={head} style={{ position: 'absolute', inset: 0, transition: 'transform 180ms cubic-bezier(.22,1,.36,1)', transformOrigin: '50% 80%' }}>
+      <div style={{ position: 'absolute', inset: 0, transform: fit < 1 ? `scale(${fit})` : '', transformOrigin: '50% 72.5%', transition: 'transform 180ms ease' }}>
         {layers.map((n) => <img key={n} src={ART[n]} alt="" draggable={false} style={{ ...img, opacity: n === frame ? 1 : 0 }} />)}
         {dressed && <img src={dressed} alt="" draggable={false} style={{ ...img, left: -size * 0.25, top: -size * 0.6, width: size * 1.5, height: size * 1.5 }} />}
         {EYE_ART && (
@@ -288,6 +296,7 @@ function ArtCat({ size, follow, mood, dance, outfit, blink, wave, eyes }: { size
             })}
           </svg>
         )}
+      </div>
       </div>
     </div>
   )

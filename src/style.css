@@ -188,7 +188,7 @@ html, body, #root { margin: 0; height: 100%; background: transparent; overflow: 
 /* compact status flash (volume / airplane mode): icon, cat and level sit together, no empty space */
 .bar.compact { display: flex; justify-content: center; align-items: center; gap: 12px; padding: 0 12px; }
 .bar.compact .title, .bar.compact .right { justify-self: auto; }
-.air-t { font-size: 13px; font-weight: 600; white-space: nowrap; }
+.hud b.air-t { font-size: 13px; font-weight: 600; white-space: nowrap; width: auto; text-align: left; } /* the message sizes itself (not the volume number's fixed 24px) */
 .card .big.sm { padding-right: 46px; line-height: 1.15; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .card .big.sm small { display: block; }
 
@@ -410,3 +410,6 @@ button:focus-visible, [role='button']:focus-visible { outline: 2px solid #ffffff
 
 /* "Drag all" tile in the file tray */
 .file.all { background: #1d2418; color: #cfe89a; box-shadow: inset 0 0 0 1px #cfe89a40; justify-content: center; }
+
+/* short messages in the notch (greeting, airplane mode) stay on one line; the notch grows to fit them */
+.hud, .bar.compact > * { white-space: nowrap; flex-shrink: 0; }

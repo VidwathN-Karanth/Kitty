@@ -47,7 +47,7 @@ function Ticker({ text, color }: { text: string; color: string }) {
 }
 
 const SIZE = {
-  closed: { width: 262, height: 34 }, hudVol: { width: 244, height: 34 }, hudAir: { width: 262, height: 34 }, hudHi: { width: 280, height: 34 },
+  closed: { width: 262, height: 34 }, hudVol: { width: 244, height: 34 }, hudHi: { width: 280, height: 34 }, // hudHi: the smallest a message notch gets
   open: { width: 640, height: 300 },
 }
 const SPRINGS = {
@@ -314,12 +314,21 @@ export default function App() {
 
   // Resting notch is only as wide as what it shows: the cat in the middle, and the wider of the two sides on both sides
   const leftEl = useRef<HTMLSpanElement>(null), rightEl = useRef<HTMLSpanElement>(null)
+  // The same goes for a short message (the greeting, airplane mode): the notch grows to fit it, whatever the font
+  const barEl = useRef<HTMLDivElement>(null)
   const [restW, setRestW] = useState(SIZE.closed.width)
+  const [hudW, setHudW] = useState(0)
   useLayoutEffect(() => {
-    if (open || hud) return
+    if (open) return
     const used = (el: HTMLElement | null, gap: number) => {
-      const kids = [...(el?.children ?? [])].filter((k) => !k.classList.contains('grow')) as HTMLElement[]
+      const kids = [...(el?.children ?? [])].filter((k) => !k.classList.contains('grow') && (k as HTMLElement).offsetWidth > 0) as HTMLElement[]
       return kids.reduce((w, k) => w + k.offsetWidth, 0) + Math.max(0, kids.length - 1) * gap
+    }
+    if (hud) {
+      const parts = [...(barEl.current?.children ?? [])].map((k) => (k as HTMLElement).scrollWidth).filter((w) => w > 0) // full width, even while squeezed
+      const w = parts.reduce((a, b) => a + b, 0) + Math.max(0, parts.length - 1) * 12 + 24 + 8 // gaps, padding, a little air
+      setHudW((cur) => (Math.abs(cur - w) < 2 ? cur : w))
+      return
     }
     const side = Math.max(used(leftEl.current, 6), used(rightEl.current, 8))
     const w = Math.max(116, 28 + 34 + 2 * (side ? side + 10 : 12))
@@ -358,7 +367,7 @@ export default function App() {
         className="island"
         style={{ ['--isl' as string]: settings.islandTop }}
         initial={false}
-        animate={open ? SIZE.open : hud === 'vol' ? SIZE.hudVol : hud === 'air' ? SIZE.hudAir : hud === 'hi' ? SIZE.hudHi : { width: restW, height: SIZE.closed.height }}
+        animate={open ? SIZE.open : hud === 'vol' ? SIZE.hudVol : hud === 'air' || hud === 'hi' ? { width: Math.max(SIZE.hudHi.width, hudW), height: SIZE.closed.height } : { width: restW, height: SIZE.closed.height }}
         transition={spring}
         onMouseEnter={() => { hovered.current = true; setHud(null); setOpen(true) }}
         onDragEnter={() => { setOpen(true); setTab('tray') }}
@@ -373,7 +382,7 @@ export default function App() {
           style={{ background: tab === 'music' && open && bg.length ? musicBackground(bg) : tab === 'music' && open && tint ? `linear-gradient(180deg, #000 30%, ${tint})` : `linear-gradient(180deg, ${settings.islandTop}, ${settings.islandBottom})`, transition: 'background 600ms' }}
         >
           {media.state.playing && settings.musicGlow !== 'off' && <RunningLight mode={settings.musicGlow} palette={settings.musicGlow === 'rainbow' ? RAINBOW : palette} />}
-          <div className={'bar' + (hud && !open ? ' compact' : !open ? ' rest' : '')}>
+          <div ref={barEl} className={'bar' + (hud && !open ? ' compact' : !open ? ' rest' : '')}>
             <span className="title" ref={leftEl}>{leftIcons}{open && tab !== 'home' && <>{t1}<span style={{ color: cur.color }}>{t2}</span></>}</span>
             <span className="mid">
               <span className="pet" onMouseMove={pet}>

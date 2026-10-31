@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Settings as Gear, Volume2, VolumeX, Plane, Mic, Video, LayoutGrid } from 'lucide-react'
+import { Settings as Gear, Volume2, VolumeX, Plane, Mic, Video, LayoutGrid, Ellipsis } from 'lucide-react'
 import { TABS, TabId } from './tabs'
 import Home from './Home'
 import Cat, { Mood } from './Cat'
@@ -397,7 +397,7 @@ export default function App() {
                     {light && <StatusDot color={light.color} kind={light.kind} />}
                     {m.playing && <Bars color={TAN} active colors={settings.musicGlow === 'adaptive' ? palette : RAINBOW} />}
                   </>}
-              {open && <button className="dots" onClick={() => setMenu((x) => !x)} aria-label="Menu">{'•••'}{update.state === 'ready' && <i className="upd-dot" />}</button>}
+              {open && <button className="dots" onClick={() => setMenu((x) => !x)} aria-label="Menu"><Ellipsis size={18} />{update.state === 'ready' && <i className="upd-dot" />}</button>}
             </span>
           </div>
 

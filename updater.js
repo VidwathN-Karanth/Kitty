@@ -6,6 +6,13 @@ let autoUpdater = null
 let status = { state: 'idle', current: app.getVersion() }
 let send = () => {}
 
+// GitHub answers 404 when the repository is private or has no published release yet: say that plainly
+function friendly(e) {
+  const m = String(e?.message ?? e)
+  if (/\b404\b/.test(m)) return 'No updates published yet'
+  if (/ENOTFOUND|ETIMEDOUT|ECONNRESET|EAI_AGAIN|net::/.test(m)) return 'No internet connection'
+  return m.split('\n')[0].slice(0, 120)
+}
 function set(patch) { status = { ...status, ...patch }; send(status) }
 function check() { autoUpdater?.checkForUpdates().catch(() => {}) } // failures also arrive via the 'error' event
 
@@ -25,7 +32,7 @@ function start(onStatus) {
     .on('update-not-available', () => set({ state: 'uptodate' }))
     .on('download-progress', (p) => set({ state: 'downloading', percent: Math.round(p.percent) }))
     .on('update-downloaded', (i) => set({ state: 'ready', version: i.version }))
-    .on('error', (e) => set({ state: 'error', error: String(e?.message ?? e).slice(0, 140) }))
+    .on('error', (e) => set({ state: 'error', error: friendly(e) }))
   check()
   setInterval(check, 6 * 3600 * 1000)
 }

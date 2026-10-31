@@ -6,6 +6,39 @@ $null = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager,
 $null = [Windows.Storage.Streams.IRandomAccessStreamReference, Windows.Storage.Streams, ContentType = WindowsRuntime]
 $null = [Windows.Storage.Streams.IRandomAccessStreamWithContentType, Windows.Storage.Streams, ContentType = WindowsRuntime]
 $null = [Windows.Storage.Streams.IInputStream, Windows.Storage.Streams, ContentType = WindowsRuntime]
+# Window drags: while the left button is held and the active window moves, someone is dragging a window (maybe to
+# the top of the screen for Snap layouts). Reported as {"type":"windrag","on":true/false} so the island steps aside.
+Add-Type -TypeDefinition @'
+using System; using System.Runtime.InteropServices; using System.Threading;
+public static class WinDrag {
+  [DllImport("user32.dll")] static extern short GetAsyncKeyState(int k);
+  [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr h, out RECT r);
+  [StructLayout(LayoutKind.Sequential)] struct RECT { public int L, T, R, B; }
+  public static void Start() {
+    var t = new Thread(() => {
+      bool down = false, drag = false; IntPtr w = IntPtr.Zero; RECT r0 = new RECT();
+      while (true) {
+        bool now = (GetAsyncKeyState(1) & 0x8000) != 0;
+        IntPtr fg = GetForegroundWindow();
+        // a click on an inactive window activates it a moment later: follow whichever window is active
+        if (now && (!down || fg != w)) { w = fg; GetWindowRect(w, out r0); }
+        else if (now && !drag) {
+          RECT r; IntPtr f = fg;
+          if (f == w && GetWindowRect(f, out r) && (Math.Abs(r.L - r0.L) > 6 || Math.Abs(r.T - r0.T) > 6) && r.R - r.L == r0.R - r0.L) {
+            drag = true; Console.Out.WriteLine("{\"type\":\"windrag\",\"on\":true}"); Console.Out.Flush();
+          }
+        } else if (!now && drag) { drag = false; Console.Out.WriteLine("{\"type\":\"windrag\",\"on\":false}"); Console.Out.Flush(); }
+        down = now;
+        Thread.Sleep(40);
+      }
+    });
+    t.IsBackground = true; t.Start();
+  }
+}
+'@
+[WinDrag]::Start()
+
 $asStream = [System.IO.WindowsRuntimeStreamExtensions].GetMethod('AsStreamForRead', [type[]]@([Windows.Storage.Streams.IInputStream]))
 
 $asTask = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object {
@@ -81,23 +114,58 @@ public class Audio {
 '@
 } catch {}
 
+# GPU usage (%), only while the app asks for it ("gpu on" / "gpu off"). Windows only exposes it through the
+# "GPU Engine" performance counters (one per process and engine): the 3D engines are summed per graphics card and
+# the busiest card is reported, like Task Manager does.
+$gpuOn = $false; $gpuTick = 0; $gpuRefresh = 0; $counters = @{}
+function GpuUsage {
+  if ($script:gpuRefresh -le 0) {
+    # processes come and go, so pick up the current instances every 10 seconds
+    $script:gpuRefresh = 5
+    $names = (New-Object System.Diagnostics.PerformanceCounterCategory('GPU Engine')).GetInstanceNames() | Where-Object { $_ -like '*engtype_3D*' }
+    foreach ($n in $names) { if (-not $counters.ContainsKey($n)) { $c = New-Object System.Diagnostics.PerformanceCounter('GPU Engine', 'Utilization Percentage', $n); $null = $c.NextValue(); $counters[$n] = $c } }
+    foreach ($k in @($counters.Keys)) { if ($names -notcontains $k) { $counters[$k].Dispose(); $counters.Remove($k) } }
+  }
+  $script:gpuRefresh--
+  $perCard = @{}
+  foreach ($k in @($counters.Keys)) {
+    try { $v = $counters[$k].NextValue() } catch { continue }
+    $card = ($k -replace '.*(luid_0x[0-9a-fA-F]+_0x[0-9a-fA-F]+).*', '$1')
+    $perCard[$card] = ($perCard[$card] + $v)
+  }
+  $gpu = 0; foreach ($v in $perCard.Values) { if ($v -gt $gpu) { $gpu = $v } }
+  [math]::Round([math]::Min(100, $gpu))
+}
+
 while ($true) {
-  # prefer a session that is actually playing (the "current" one can be a paused tab or app)
+  # prefer a session that is actually playing (the "current" one can be a paused tab or app). Browsers can have
+  # several playing at once (a song and a muted video): stay with the one already shown, so the title does not flip.
   $s = $null; $count = 0
   try {
     $all = @($mgr.GetSessions()); $count = $all.Count
-    foreach ($x in $all) { if ($x.GetPlaybackInfo().PlaybackStatus -eq 'Playing') { $s = $x; break } }
+    $playing = @($all | Where-Object { $_.GetPlaybackInfo().PlaybackStatus -eq 'Playing' })
+    if ($playing.Count -gt 1) {
+      foreach ($x in $playing) {
+        try { $p = Await ($x.TryGetMediaPropertiesAsync()) ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionMediaProperties]); if ("$($p.Title)|$($p.Artist)" -eq $key) { $s = $x; break } } catch {}
+      }
+      if (-not $s) { $c = $mgr.GetCurrentSession(); if ($c -and $c.GetPlaybackInfo().PlaybackStatus -eq 'Playing') { $s = $c } }
+    }
+    if (-not $s -and $playing.Count) { $s = $playing[0] }
     if (-not $s) { $s = $mgr.GetCurrentSession() }
     if (-not $s -and $count -gt 0) { $s = $all[0] }
   } catch { $s = $mgr.GetCurrentSession() }
 
-  if ($cmd.IsCompleted) {
+  # every command that came in since the last round (dragging the volume slider sends many: only the last one counts)
+  $quit = $false; $newVol = $null
+  while ($cmd.IsCompleted) {
     $line = $cmd.Result
-    if ($null -eq $line) { break }   # parent closed stdin: exit
+    if ($null -eq $line) { $quit = $true; break }   # parent closed stdin: exit
     $cmd = $stdin.ReadLineAsync()
     $line = $line.Trim()
-    if ($line -like 'vol *') { try { [Audio]::Volume = [float]::Parse($line.Substring(4), [Globalization.CultureInfo]::InvariantCulture) } catch {} }
+    if ($line -like 'vol *') { $newVol = $line.Substring(4) }
     elseif ($line -eq 'mute') { try { [Audio]::Mute = -not [Audio]::Mute } catch {} }
+    elseif ($line -eq 'gpu on') { $gpuOn = $true; $gpuTick = 0 }
+    elseif ($line -eq 'gpu off') { $gpuOn = $false; foreach ($c in $counters.Values) { $c.Dispose() }; $counters.Clear(); $gpuRefresh = 0 }
     elseif ($s) {
       switch ($line) {
         'toggle' { $null = Await ($s.TryTogglePlayPauseAsync()) ([bool]) }
@@ -107,6 +175,8 @@ while ($true) {
       $tick = 0
     }
   }
+  if ($quit) { break }
+  if ($null -ne $newVol) { try { [Audio]::Volume = [float]::Parse($newVol, [Globalization.CultureInfo]::InvariantCulture) } catch {} }
 
   # system volume: report whenever it changes (hardware keys, other apps, or our own slider)
   try {
@@ -153,6 +223,12 @@ while ($true) {
       } catch {}
     }
   }
+  # GPU usage every 2 seconds, while it is shown
+  if ($gpuOn) {
+    if ($gpuTick -le 0) { $gpuTick = 8; try { Emit @{ type = 'gpu'; gpu = (GpuUsage) } } catch { Emit @{ type = 'gpu'; gpu = $null } } }
+    $gpuTick--
+  }
+
   $tick--
   Start-Sleep -Milliseconds 250
 }

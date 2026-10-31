@@ -39,7 +39,7 @@ interface Window {
     onTray(cb: (f: TrayFile[]) => void): () => void
     removeFile(path: string): void
     openFile(path: string): void
-    dragFile(path: string): void
+    dragFile(path: string | string[]): void
     media(): Promise<Media>
     onMedia(cb: (m: Media) => void): () => void
     mediaCmd(cmd: string): void
@@ -71,6 +71,7 @@ interface Window {
     openUrl(url: string): void
     onGoto(cb: (tab: string) => void): () => void
     onToggle(cb: () => void): void
+    onFold(cb: () => void): () => void
     bump(name: 'focus' | 'answers'): void
     stats(): Promise<SysStats>
     onStats(cb: (s: SysStats) => void): () => void

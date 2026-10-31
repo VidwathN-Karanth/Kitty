@@ -44,13 +44,21 @@ function create() {
     width: W, height: H, x: Math.round(x + (width - W) / 2), y: 0,
     frame: false, transparent: true, resizable: false, skipTaskbar: true,
     alwaysOnTop: true, hasShadow: false, focusable: true,
+    // never snapped, maximized or resized by Windows (Snap layouts once cut the island in half)
+    thickFrame: false, maximizable: false, minimizable: false, fullscreenable: false,
     webPreferences: { preload: path.join(__dirname, 'preload.js') },
   })
   win.setAlwaysOnTop(true, 'screen-saver')
   win.setIgnoreMouseEvents(true, { forward: true })
   // Other "always on top" windows (fullscreen apps, players, popups) can still land above the island. Take the top
   // spot back right away when that happens, and check again every second (moveTop never steals the keyboard focus).
-  const top = () => { if (win && !win.isDestroyed() && win.isVisible() && !paused) { win.setAlwaysOnTop(true, 'screen-saver'); win.moveTop() } }
+  const home = { width: W, height: H, x: Math.round(x + (width - W) / 2), y: 0 }
+  const top = () => {
+    if (!win || win.isDestroyed() || !win.isVisible() || paused) return
+    win.setAlwaysOnTop(true, 'screen-saver'); win.moveTop()
+    const b = win.getBounds()
+    if (b.x !== home.x || b.y !== home.y || b.width !== home.width || b.height !== home.height) win.setBounds(home) // put back if moved or resized
+  }
   win.on('always-on-top-changed', (_e, on) => { if (!on) top() })
   win.on('blur', top)
   setInterval(top, 1000)
@@ -164,7 +172,7 @@ function poll() {
   if (!paused && win && !win.isDestroyed()) {
     const p = screen.getCursorScreenPoint(), b = win.getBounds()
     const x = p.x - b.x, y = p.y - b.y
-    const inside = x >= rect.x - 4 && x <= rect.x + rect.w + 4 && y >= rect.y && y <= rect.y + rect.h + 4
+    const inside = !dragHidden && x >= rect.x - 4 && x <= rect.x + rect.w + 4 && y >= rect.y && y <= rect.y + rect.h + 4
     if (inside === ignoring) { ignoring = !inside; win.setIgnoreMouseEvents(ignoring, { forward: true }) }
     const key = p.x + ',' + p.y
     still = key === last
@@ -214,7 +222,11 @@ ipcMain.handle('tray:get', trayList)
 ipcMain.on('tray:add', (_e, paths) => { tray = [...new Set([...tray, ...paths])]; saveTray(); pushTray() })
 ipcMain.on('tray:remove', (_e, p) => { tray = tray.filter((x) => x !== p); saveTray(); pushTray() })
 ipcMain.on('tray:open', (_e, p) => shell.openPath(p))
-ipcMain.on('tray:drag', async (e, p) => e.sender.startDrag({ file: p, icon: await app.getFileIcon(p) }))
+// one file, or several at once (the "Drag all" handle): Windows drops them all together
+ipcMain.on('tray:drag', async (e, p) => {
+  const list = [].concat(p).filter((f) => fs.existsSync(f))
+  if (list.length) e.sender.startDrag({ file: list[0], files: list, icon: await app.getFileIcon(list[0]) })
+})
 
 // ---------- media (Spotify etc.), volume, airplane mode, mic/camera ----------
 let media = { state: { active: false }, art: null, vol: null, air: false, priv: { mic: false, cam: false } }, helper
@@ -225,6 +237,7 @@ function startMedia() {
   helper = spawn('powershell.exe', ['-NoProfile', '-NoLogo', '-ExecutionPolicy', 'Bypass', '-File', unpacked('media.ps1')], { windowsHide: true })
   let buf = ''
   helper.stdout.setEncoding('utf8')
+  if (gpuWanted) helper.stdin.write('gpu on\n') // a restarted helper picks up where the old one was
   helper.stdout.on('data', (d) => {
     buf += d
     let i
@@ -236,12 +249,23 @@ function startMedia() {
         else if (m.type === 'priv') media.priv = { mic: m.mic, cam: m.cam }
         else if (m.type === 'vol') media.vol = { v: m.v, mute: m.mute }
         else if (m.type === 'art') media.art = { mime: m.mime, data: m.data }
+        else if (m.type === 'gpu') { sysStats.gpu = m.gpu; continue }
+        else if (m.type === 'windrag') { windowDrag(m.on); continue }
         else { if (!m.active) media.art = null; media.state = { ...m, at: Date.now() } }
         pushMedia()
       } catch {}
     }
   })
   helper.on('exit', () => { helper = null; if (!quitting && !paused) setTimeout(startMedia, 3000) })
+}
+// Someone is dragging a window (maybe to the top for Snap layouts): fold the island and step aside until they let go.
+// It turns invisible and lets every click and hover through (no mouse events reach it, so it can't open either).
+let dragHidden = false
+function windowDrag(on) {
+  if (!win || win.isDestroyed() || on === dragHidden) return
+  dragHidden = on
+  if (on) { win.webContents.send('fold'); win.setOpacity(0); win.setIgnoreMouseEvents(true); ignoring = true }
+  else { win.setOpacity(1); win.setIgnoreMouseEvents(true, { forward: true }) }
 }
 let quitting = false
 app.on('before-quit', () => { quitting = true; helper?.kill() })
@@ -263,7 +287,7 @@ ipcMain.on('test:run', (_e, kind) => {
 })
 
 // ---------- system stats: CPU and RAM from Node, GPU from a PowerShell helper (only while it is shown) ----------
-let sysStats = { cpu: null, ram: null, ramUsed: 0, ramTotal: 0, gpu: null }, gpuHelper = null, lastCpu = null
+let sysStats = { cpu: null, ram: null, ramUsed: 0, ramTotal: 0, gpu: null }, lastCpu = null
 const cpuTimes = () => os.cpus().reduce((a, c) => { const t = c.times; a.idle += t.idle; a.total += t.user + t.nice + t.sys + t.idle + t.irq; return a }, { idle: 0, total: 0 })
 function sampleStats() {
   if (paused) return
@@ -276,25 +300,14 @@ function sampleStats() {
   sysStats.ramTotal = Math.round(total / 2 ** 30)
   win?.webContents.send('stats', sysStats)
 }
+// GPU usage comes from the media helper (one PowerShell for everything): ask for it only while it is shown
+let gpuWanted = false
 function syncGpuHelper(s) {
-  const want = !paused && s.stats.gpu && (s.statsRest || s.statsOpen)
-  if (want && !gpuHelper) {
-    gpuHelper = spawn('powershell.exe', ['-NoProfile', '-NoLogo', '-ExecutionPolicy', 'Bypass', '-File', unpacked('stats.ps1')], { windowsHide: true })
-    let buf = ''
-    gpuHelper.stdout.setEncoding('utf8')
-    gpuHelper.stdout.on('data', (d) => {
-      buf += d
-      let i
-      while ((i = buf.indexOf('\n')) >= 0) { const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1); try { sysStats.gpu = JSON.parse(line).gpu } catch {} }
-    })
-    gpuHelper.on('exit', () => { gpuHelper = null; sysStats.gpu = null; if (!quitting) setTimeout(() => syncGpuHelper(settings.get()), 5000) })
-  } else if (!want && gpuHelper) {
-    const h = gpuHelper; gpuHelper = null; sysStats.gpu = null
-    h.removeAllListeners('exit'); h.stdin.end(); h.kill()
-  }
+  gpuWanted = !paused && s.stats.gpu && (s.statsRest || s.statsOpen)
+  if (!gpuWanted) sysStats.gpu = null
+  helper?.stdin.write(gpuWanted ? 'gpu on\n' : 'gpu off\n')
 }
 ipcMain.handle('stats:get', () => sysStats)
-app.on('before-quit', () => gpuHelper?.kill())
 
 // ---------- chat ----------
 // Asks the user's own Claude through the Claude Code CLI (`claude -p`, prompt on stdin).
@@ -325,7 +338,20 @@ ipcMain.on('chat:ask', (e, { id, prompt }) => {
 
 // Which AI command-line tools exist on this PC
 let cli = null
-ipcMain.handle('cli:check', () => cli ?? (cli = Promise.all(['claude', 'codex'].map((c) => new Promise((res) => execFile(c, ['--version'], { shell: true, timeout: 8000, windowsHide: true }, (err) => res(!err))))).then(([c, x]) => ({ claude: c, codex: x }))))
+// Is a CLI installed? Kitty's PATH is the one Windows gave it at login, so a tool installed later, or one in a usual
+// install folder that is not on that PATH (npm, WinGet, Scoop, Volta...), would be missed by just running it. So:
+// the usual folders are checked too, and the folder the tool keeps its settings in (~/.claude, ~/.codex) also
+// counts (that is also how the Codex desktop app shows up).
+function hasCli(name) {
+  const env = process.env, home = os.homedir()
+  const dirs = [...(env.PATH || '').split(';'), path.join(env.APPDATA || '', 'npm'), path.join(env.LOCALAPPDATA || '', 'Microsoft', 'WinGet', 'Links'),
+    path.join(home, '.local', 'bin'), path.join(home, 'scoop', 'shims'), path.join(env.LOCALAPPDATA || '', 'Volta', 'bin'), path.join(env.ProgramFiles || '', 'nodejs'),
+    path.join(env.LOCALAPPDATA || '', 'Programs', name), path.join(home, '.bun', 'bin'), path.join(env.LOCALAPPDATA || '', 'pnpm')]
+  if (dirs.some((d) => d && ['.exe', '.cmd', '.bat', '.ps1', ''].some((x) => fs.existsSync(path.join(d, name + x))))) return Promise.resolve(true)
+  if (fs.existsSync(path.join(home, '.' + name))) return Promise.resolve(true)
+  return new Promise((res) => execFile(name, ['--version'], { shell: true, timeout: 8000, windowsHide: true }, (err) => res(!err)))
+}
+ipcMain.handle('cli:check', () => cli ?? (cli = Promise.all([hasCli('claude'), hasCli('codex')]).then(([c, x]) => ({ claude: c, codex: x }))))
 
 // ---------- Claude Code ----------
 ipcMain.handle('claude:get', () => claude.snapshot())

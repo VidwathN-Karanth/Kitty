@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Inbox, X } from 'lucide-react'
+import { Files, Inbox, X } from 'lucide-react'
 
-// Drop zone + list of remembered files. Drag a file out of here into any app; click to open.
+// Drop zone + list of remembered files. Drag a file (or all of them at once) out of here into any app; click to open.
 export default function Tray() {
   const [files, setFiles] = useState<TrayFile[]>([])
   useEffect(() => {
@@ -20,6 +20,12 @@ export default function Tray() {
 
   return (
     <div className="files">
+      {files.length > 1 && (
+        <div className="file all" draggable title="Drag every file out at once" onDragStart={(e) => { e.preventDefault(); window.kitty.dragFile(files.map((f) => f.path)) }}>
+          <Files size={26} />
+          <span>Drag all {files.length}</span>
+        </div>
+      )}
       {files.map((f) => (
         <div
           key={f.path}

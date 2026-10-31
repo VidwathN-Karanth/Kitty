@@ -54,16 +54,26 @@ const PAGE = `(async (sheets, cfg) => {
 
   // dressed cells are one sticker (cat and outfit share the white edge): small bits of the next cell are dropped
   function keepMain(p, w, h) {
-    const id = new Int32Array(w * h).fill(-1), size = []
+    const id = new Int32Array(w * h).fill(-1), size = [], edges = []
     for (let s = 0; s < w * h; s++) {
       if (id[s] >= 0 || p[s * 4 + 3] < 128) continue
-      const c = size.length, st = [s]; id[s] = c; let n = 0
-      while (st.length) { const k = st.pop(), x = k % w; n++
+      const c = size.length, st = [s]; id[s] = c; let n = 0, edge = false
+      while (st.length) { const k = st.pop(), x = k % w, y = (k / w) | 0; n++
+        if (x < w * 0.04 || y < h * 0.04 || x > w * 0.96 || y > h * 0.96) edge = true
         for (const m of [k - 1, k + 1, k - w, k + w]) if (m >= 0 && m < w * h && id[m] < 0 && p[m * 4 + 3] >= 128 && Math.abs((m % w) - x) <= 1) { id[m] = c; st.push(m) } }
-      size.push(n)
+      size.push(n); edges.push(edge)
     }
     const main = size.indexOf(Math.max(...size))
-    for (let k = 0; k < w * h; k++) if (id[k] >= 0 && id[k] !== main && size[id[k]] < size[main] * 0.05) p[k * 4 + 3] = 0 // a halo floating above stays
+    // small loose bits go, and bigger ones too if they touch the cell edge (part of the next cell); a halo floating
+    // above the head stays
+    const keep = (c) => c === main || size[c] >= size[main] * (edges[c] ? 0.15 : 0.05)
+    for (let k = 0; k < w * h; k++) if (id[k] >= 0 && !keep(id[k])) { p[k * 4 + 3] = 0; id[k] = -1 }
+    // faint see-through pixels count only next to something that stays (soft edges, a halo's glow); faint smudges
+    // on their own (the edge of the next cell) go
+    const near = new Uint8Array(w * h), R = 4
+    for (let k = 0; k < w * h; k++) if (id[k] >= 0) { const x = k % w, y = (k / w) | 0
+      for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) { const xx = x + dx, yy = y + dy; if (xx >= 0 && yy >= 0 && xx < w && yy < h) near[yy * w + xx] = 1 } }
+    for (let k = 0; k < w * h; k++) if (id[k] < 0 && !near[k]) p[k * 4 + 3] = 0
   }
   const faces = {}, items = {}
   for (let s = 0; s < cfg.length; s++) {

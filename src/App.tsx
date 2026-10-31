@@ -30,11 +30,18 @@ type Hud = 'vol' | 'air' | 'hi' | null
 
 // A MacBook-style notch: flat against the top edge, rounded at the bottom, with small concave "ears" at the top corners
 // Song title running through a small capsule, like a sign board. The capsule takes the album's colour.
+// It runs at a steady speed (measured, not guessed from the length), and a new title only takes over once it has
+// stayed the same for a moment, so a player that keeps changing its title can't make it flicker.
 function Ticker({ text, color }: { text: string; color: string }) {
   const bg = color ? `color-mix(in oklab, ${color} 78%, #000)` : '#2a2a2e'
+  const [shown, setShown] = useState(text)
+  useEffect(() => { const t = setTimeout(() => setShown(text), 1500); return () => clearTimeout(t) }, [text])
+  const run = useRef<HTMLSpanElement>(null)
+  const [secs, setSecs] = useState(10)
+  useLayoutEffect(() => { if (run.current) setSecs(Math.max(4, run.current.scrollWidth / 2 / 28)) }, [shown]) // 28 px a second
   return (
-    <span className="ticker" style={{ background: bg }} title={text}>
-      <span className="ticker-run" style={{ animationDuration: `${Math.max(6, text.length * 0.32)}s` }}>{text}<i />{text}<i /></span>
+    <span className="ticker" style={{ background: bg }} title={shown}>
+      <span key={shown} ref={run} className="ticker-run" style={{ animationDuration: `${secs}s` }}>{shown}<i />{shown}<i /></span>
     </span>
   )
 }
@@ -124,6 +131,7 @@ export default function App() {
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000)
     window.kitty.onToggle(() => setOpen((o) => !o))
+    window.kitty.onFold(() => { hovered.current = false; setOpen(false); setMenu(false); setVolPop(false) }) // a window is being dragged
     const offGoto = window.kitty.onGoto((id) => { setTab(id as TabId); peek(6000) }) // global shortcuts jump straight to a tab
     window.kitty.usage().then(setUsed)
     const offUsage = window.kitty.onUsage(setUsed)

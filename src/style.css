@@ -1,4 +1,4 @@
-:root { --accent: #cfe89a; font-family: 'Segoe UI Variable', 'Segoe UI', sans-serif; color: #fff; }
+:root { --accent: #cfe89a; color: #fff; }
 html, body, #root { margin: 0; height: 100%; background: transparent; overflow: hidden; }
 .stage { display: flex; justify-content: center; }
 
@@ -251,8 +251,8 @@ html, body, #root { margin: 0; height: 100%; background: transparent; overflow: 
 .mini-art { width: 22px; height: 22px; border-radius: 6px; object-fit: cover; box-shadow: 0 0 0 1px #ffffff22; }
 
 /* ======================= polish layer ======================= */
-:root { --ease: cubic-bezier(0.22, 1, 0.36, 1); font-family: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
-button { font-family: inherit; }
+:root { --ease: cubic-bezier(0.22, 1, 0.36, 1); font-family: 'Cascadia Mono', Consolas, monospace; -webkit-font-smoothing: antialiased; }
+button, input, textarea, select { font-family: inherit; }
 button:focus-visible, [role='button']:focus-visible { outline: 2px solid #ffffff88; outline-offset: 2px; }
 ::selection { background: #ffffff33; }
 .island { filter: drop-shadow(0 12px 22px #0009); }
@@ -362,17 +362,6 @@ button:focus-visible, [role='button']:focus-visible { outline: 2px solid #ffffff
 .chip-e { flex-shrink: 1; justify-content: flex-end; }
 .strip .stat-bar { width: 26px; }
 
-/* ---- running light around the island while music plays (sides + bottom, the top edge stays dark) ---- */
-@property --run { syntax: '<angle>'; inherits: true; initial-value: 0deg; }
-.runlight { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 4;
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0, transparent 7px, #000 24px); mask-image: linear-gradient(to bottom, transparent 0, transparent 7px, #000 24px);
-  animation: runlight 3.4s linear infinite; }
-@keyframes runlight { to { --run: 360deg; } }
-.runlight .rl-ring { position: absolute; inset: 0; border-radius: inherit; padding: 2px; background: var(--comet);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
-.runlight .rl-ring.soft { padding: 7px; filter: blur(7px); opacity: 0.75; }
-@media (prefers-reduced-motion: reduce) { .runlight { animation-duration: 12s !important; } }
-
 /* colourful music bars */
 .bars.on i[style] { filter: saturate(1.3); }
 
@@ -384,31 +373,27 @@ button:focus-visible, [role='button']:focus-visible { outline: 2px solid #ffffff
 /* the play/pause icon is not the ring: keep it in normal flow, centred */
 .hc-ring > span svg { position: static; }
 
-/* ---- running light, refined: thin, two layers, smooth OKLCH blend + soft highlight ---- */
-@property --run2 { syntax: '<angle>'; inherits: true; initial-value: 0deg; }
-.runlight { animation: none; }
-.rl-blend, .rl-comet { position: absolute; inset: 0; border-radius: inherit; padding: 1.5px;
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
-.rl-blend { background: var(--blend); opacity: 0.9; animation: rl-turn 10s linear infinite; }
-.rl-blend.soft { padding: 3px; filter: blur(3px); opacity: 0.4; }
-.rl-comet { background: var(--comet); animation: rl-run 3.8s linear infinite; mix-blend-mode: screen; }
-.runlight.white .rl-blend { opacity: 0.55; }
-@keyframes rl-turn { to { --run: 360deg; } }
-@keyframes rl-run { to { --run2: 360deg; } }
-
 /* music view: the source chip sits top-right beside the title, clear of the progress bar */
 .music { position: relative; }
 .m-src { top: 6px; right: 2px; bottom: auto !important; font-size: 12px; padding: 5px 11px; background: #ffffff1f; backdrop-filter: blur(6px); }
 
-/* the gradients are built on .runlight from --run / --run2, so that is where the angles must animate
-   (animating them on the children left the inherited gradient frozen) */
-.runlight { animation: rl-turn 10s linear infinite, rl-run 3.6s linear infinite !important; }
-.rl-blend, .rl-comet { animation: none !important; }
-
-/* final: every ring animates its own angle and draws its own gradient from it */
-.runlight { animation: none !important; }
-.rl-blend { background: conic-gradient(in oklch from var(--run), var(--stops)) !important; animation: rl-turn 10s linear infinite !important; }
-.rl-comet { background: conic-gradient(from var(--run2), var(--cstops)) !important; animation: rl-run 3.6s linear infinite !important; }
+/* ---- running light around the island while music plays (sides + bottom, the top edge stays dark) ----
+   Each ring is a thin outline (a mask cut out of a box). Inside it, one big square with the colours drawn ONCE
+   spins around the centre: a spin is cheap for the graphics card, while redrawing the gradient every frame cost a
+   lot of memory and CPU. */
+.runlight { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 4;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, transparent 7px, #000 24px); mask-image: linear-gradient(to bottom, transparent 0, transparent 7px, #000 24px); }
+.rl-blend, .rl-comet { position: absolute; inset: 0; border-radius: inherit; padding: 1.5px; overflow: hidden;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+.rl-blend { opacity: 0.9; }
+.rl-blend.soft { padding: 3px; filter: blur(3px); opacity: 0.4; }
+.rl-comet { mix-blend-mode: screen; }
+.runlight.white .rl-blend { opacity: 0.55; }
+.runlight b { position: absolute; left: 50%; top: 50%; width: 1100px; height: 1100px; margin: -550px 0 0 -550px; will-change: transform;
+  animation: rl-spin 10s linear infinite; }
+.rl-comet b { animation-duration: 3.6s; }
+@keyframes rl-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .runlight b { animation-duration: 30s; } }
 
 /* ---- scrolling song title in the resting notch ---- */
 .ticker { width: 96px; height: 18px; border-radius: 9px; overflow: hidden; display: inline-flex; align-items: center; flex-shrink: 0;
@@ -422,3 +407,6 @@ button:focus-visible, [role='button']:focus-visible { outline: 2px solid #ffffff
 .heart { position: absolute; left: 50%; top: 40%; font-style: normal; font-size: 13px; color: #ff4f8b; pointer-events: none; z-index: 3;
   text-shadow: 0 0 6px #ff4f8baa; animation: heart 1.1s cubic-bezier(.22,1,.36,1) forwards; }
 @keyframes heart { 0% { opacity: 0; transform: translate(-50%, 0) scale(.4); } 20% { opacity: 1; } 100% { opacity: 0; transform: translate(calc(-50% + var(--hx)), 26px) scale(1.15); } }
+
+/* "Drag all" tile in the file tray */
+.file.all { background: #1d2418; color: #cfe89a; box-shadow: inset 0 0 0 1px #cfe89a40; justify-content: center; }

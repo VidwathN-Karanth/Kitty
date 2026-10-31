@@ -48,6 +48,12 @@ function create() {
   })
   win.setAlwaysOnTop(true, 'screen-saver')
   win.setIgnoreMouseEvents(true, { forward: true })
+  // Other "always on top" windows (fullscreen apps, players, popups) can still land above the island. Take the top
+  // spot back right away when that happens, and check again every second (moveTop never steals the keyboard focus).
+  const top = () => { if (win && !win.isDestroyed() && win.isVisible() && !paused) { win.setAlwaysOnTop(true, 'screen-saver'); win.moveTop() } }
+  win.on('always-on-top-changed', (_e, on) => { if (!on) top() })
+  win.on('blur', top)
+  setInterval(top, 1000)
   if (!app.isPackaged) {
     win.webContents.on('console-message', (_e, _l, msg) => console.log('[renderer]', msg))
     win.webContents.on('did-fail-load', (_e, c, d) => console.log('[load failed]', c, d))

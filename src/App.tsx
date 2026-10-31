@@ -285,7 +285,7 @@ export default function App() {
     ?? (cs.some((s) => s.state === 'question') ? 'surprised'
       : cs.some((s) => s.state === 'error' && s.endedAt && ms - s.endedAt < 15000) ? 'sad'
       : cs.some((s) => s.state === 'done' && s.endedAt && ms - s.endedAt < 6000) ? 'proud'
-      : m.playing && settings.dancing ? 'listening'
+      : m.playing ? 'listening' // music always means headphones; the Dancing setting only decides whether it dances
       : cs.some((s) => s.state === 'working') ? 'focused'
       : hud === 'hi' ? 'happy'
       : trick

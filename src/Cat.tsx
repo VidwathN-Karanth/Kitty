@@ -265,9 +265,9 @@ function ArtCat({ size, follow, mood, dance, outfit, blink, wave, eyes }: { size
 
   const calm = mood === 'normal'
   const item = artOutfit(outfit), waving = wave && !!ART.wave
-  // dressed: shown while the cat is calm, listening to music or watching Claude work (other faces show without the
-  // outfit, and it doesn't blink in it)
-  const dressed = (calm || mood === 'listening' || mood === 'focused') && !waving && EYE_ART && WEAR[item] ? WEAR[item] : null
+  // dressed: shown while the cat is calm or watching Claude work. Other faces show without the outfit (music always
+  // means headphones), and it doesn't blink in it.
+  const dressed = (calm || mood === 'focused') && !waving && EYE_ART && WEAR[item] ? WEAR[item] : null
   const fit = dressed && size < 60 ? notchFit(item) : 1
   const frame = dressed ? 'dressed' : waving ? 'wave' : calm && lid ? lid : calm && EYE_ART ? 'eyes-blank' : calm && dir ? dir : ART[mood] ? mood : 'normal'
   const pupilsOn = frame === 'eyes-blank' || (frame === 'dressed' && !SHADES.has(item))

@@ -246,6 +246,7 @@ function startMedia() {
       try {
         const m = JSON.parse(line)
         if (m.type === 'air') media.air = m.on
+        else if (m.type === 'radios') media.radios = { wifi: m.wifi, bt: m.bt }
         else if (m.type === 'priv') media.priv = { mic: m.mic, cam: m.cam }
         else if (m.type === 'vol') media.vol = { v: m.v, mute: m.mute }
         else if (m.type === 'art') media.art = { mime: m.mime, data: m.data }

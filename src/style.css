@@ -431,3 +431,6 @@ button:focus-visible, [role='button']:focus-visible { outline: 2px solid #ffffff
 
 /* both sides always get the same width, so the cat is exactly in the middle, open or closed */
 .bar:not(.compact) { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
+
+/* Wi-Fi off or not connected, Bluetooth off: dimmed */
+.spk.off { opacity: 0.4; }

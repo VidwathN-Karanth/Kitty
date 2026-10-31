@@ -93,6 +93,20 @@ function InUse($cap) {
 
 $null = [Windows.Devices.Radios.Radio, Windows.System.Devices, ContentType = WindowsRuntime]
 $radioList = [System.Collections.Generic.IReadOnlyList[Windows.Devices.Radios.Radio]]
+# Wi-Fi: 'connected' | 'on' | 'off', Bluetooth: 'on' | 'off' (null when the PC has no such radio)
+function RadioStates {
+  $w = $null; $b = $null
+  try {
+    $r = Await ([Windows.Devices.Radios.Radio]::GetRadiosAsync()) $radioList
+    foreach ($x in $r) {
+      if ("$($x.Kind)" -eq 'WiFi') { $w = if ("$($x.State)" -eq 'On') { 'on' } else { 'off' } }
+      elseif ("$($x.Kind)" -eq 'Bluetooth') { $b = if ("$($x.State)" -eq 'On') { 'on' } else { 'off' } }
+    }
+    if ($w -eq 'on' -and ([System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces() | Where-Object { "$($_.NetworkInterfaceType)" -eq 'Wireless80211' -and "$($_.OperationalStatus)" -eq 'Up' })) { $w = 'connected' }
+  } catch {}
+  return "$w|$b"
+}
+
 function AirplaneOn {
   try { $r = Await ([Windows.Devices.Radios.Radio]::GetRadiosAsync()) $radioList; return (($r.Count -gt 0) -and -not ($r | Where-Object { $_.State -eq 'On' })) }
   catch { return $false }
@@ -217,6 +231,8 @@ while ($true) {
     # airplane mode = radios exist and none of them (Wi-Fi, Bluetooth, mobile) is on
     $a = AirplaneOn
     if ($a -ne $lastA) { $lastA = $a; Emit @{ type = 'air'; on = $a } }
+    $rs = RadioStates
+    if ($rs -ne $lastRs) { $lastRs = $rs; $p2 = $rs.Split('|'); Emit @{ type = 'radios'; wifi = $(if ($p2[0]) { $p2[0] } else { $null }); bt = $(if ($p2[1]) { $p2[1] } else { $null }) } }
     if (-not $s) { Emit @{ type = 'state'; active = $false; sessions = $count } }
     else {
       try {

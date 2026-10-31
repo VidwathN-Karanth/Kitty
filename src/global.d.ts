@@ -1,5 +1,5 @@
 type MediaState = { active: boolean; title?: string; artist?: string; playing?: boolean; pos?: number; end?: number; app?: string; at?: number; sessions?: number }
-type Media = { state: MediaState; art: { mime: string; data: string } | null; vol: { v: number; mute: boolean } | null; air?: boolean; priv?: { mic: boolean; cam: boolean } }
+type Media = { state: MediaState; art: { mime: string; data: string } | null; vol: { v: number; mute: boolean } | null; air?: boolean; priv?: { mic: boolean; cam: boolean }; radios?: { wifi: 'connected' | 'on' | 'off' | null; bt: 'on' | 'off' | null } }
 type ClaudeSession = { id: string; project: string; state: 'idle' | 'working' | 'question' | 'done' | 'error'; step: number; label: string; prompt: string; startedAt: number; endedAt: number | null; updatedAt: number }
 type ClaudeData = { sessions: ClaudeSession[]; stats: { total: number; today: number; streak: number; hunger: number; counters: { focus: number; dj: number; answers: number }; flags: { night?: boolean; early?: boolean; long?: boolean }; runs: { project: string; prompt: string; startedAt: number; ms: number; status: string }[] } }
 type ClaudeEvent = { type: 'question' | 'done' | 'error'; project: string; message?: string; ms?: number }
@@ -14,7 +14,7 @@ type Settings = {
   lightPreset: string; lightWork: string; lightDone: string; lightError: string
   islandTop: string; islandBottom: string; songTicker: boolean
   sounds: boolean; soundLevel: 'soft' | 'normal' | 'loud'; notifications: boolean; confetti: boolean; warnAt: number; usageBudget: number
-  musicGlow: 'adaptive' | 'rainbow' | 'white' | 'off'; speed: 'fast' | 'normal'; volumeBar: boolean; showBattery: boolean; batteryWarning: boolean; privacyDot: boolean; weatherCity: string; calendarUrl: string
+  musicGlow: 'adaptive' | 'rainbow' | 'white' | 'off'; speed: 'fast' | 'normal'; volumeBar: boolean; showBattery: boolean; showWifi: boolean; showBluetooth: boolean; showSpeaker: boolean; batteryWarning: boolean; privacyDot: boolean; weatherCity: string; calendarUrl: string
   startWithWindows: boolean; testMode: boolean
   stats: { cpu: boolean; ram: boolean; gpu: boolean }; statsRest: boolean; statsOpen: boolean; peekOnQuestion: boolean
   shortcuts: Record<ShortcutKey, string>

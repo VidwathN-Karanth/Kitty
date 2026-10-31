@@ -33,7 +33,9 @@ const DEFAULTS = {
   musicGlow: 'adaptive', // running light around the island while music plays: adaptive | rainbow | white | off
   islandTop: '#000000', islandBottom: '#000000', // island background (same = solid, different = gradient)
   songTicker: true,       // scrolling song title next to the cat while music plays
-  speed: 'fast', volumeBar: true, showBattery: true, batteryWarning: true, privacyDot: true,
+  speed: 'fast', volumeBar: true, showBattery: true,
+  showWifi: true, showBluetooth: true, showSpeaker: true, // status icons left of CPU in the resting notch
+  batteryWarning: true, privacyDot: true,
   weatherCity: '', calendarUrl: '',
   startWithWindows: true, // starts with Windows and shows in Windows' Startup apps list
   testMode: false,

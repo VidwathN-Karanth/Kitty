@@ -6,6 +6,12 @@ import {
 import Cat, { EMOTIONS, Mood } from './Cat'
 import ClaudeMark from './ClaudeMark'
 import { useSettings, LIGHT_PRESETS, LIGHT_SWATCHES } from './useSettings'
+
+// island background presets: [top, bottom] (same = solid)
+const ISLAND_COLORS: [string, string][] = [
+  ['#000000', '#000000'], ['#1c1c1e', '#1c1c1e'], ['#0b1a3a', '#0b1a3a'], ['#2a0b3d', '#2a0b3d'], ['#3a0b1a', '#3a0b1a'], ['#0b2e22', '#0b2e22'], ['#ffffff', '#ffffff'],
+  ['#000000', '#1f2a6b'], ['#000000', '#5b1a7a'], ['#0f0c29', '#302b63'], ['#1a0a2e', '#c2185b'], ['#000000', '#0f5d4a'], ['#141e30', '#243b55'], ['#2b1055', '#7597de'], ['#3a1c71', '#d76d77'], ['#ff512f', '#dd2476'], ['#11998e', '#38ef7d'], ['#fc4a1a', '#f7b733'],
+]
 import { useClaude, pickSession } from './useClaude'
 import { useUpdate, updateLabel } from './useUpdate'
 import { useInfo } from './useInfo'
@@ -413,6 +419,13 @@ export default function SettingsApp() {
                 <input className="txt" type="password" placeholder={s.calendarUrl ? '••••••••' : 'https://… .ics'} value={cal ?? ''} onChange={(e) => setCal(e.target.value)} />
                 <button className="btn" onClick={() => { set({ calendarUrl: (cal ?? '').trim() }); setCal(null) }}>{s.calendarUrl && !cal ? 'Remove' : 'Save'}</button>
               </Row>
+              <Row title="Island colour" desc="Solid or a top-to-bottom gradient. Pick a preset or your own two colours.">
+                <span className="isl-pick">
+                  {ISLAND_COLORS.map(([a, b]) => <button key={a + b} className={s.islandTop === a && s.islandBottom === b ? 'on' : ''} style={{ background: `linear-gradient(180deg, ${a}, ${b})` }} onClick={() => set({ islandTop: a, islandBottom: b })} aria-label={a === b ? a : `${a} to ${b}`} />)}
+                  <label title="Top colour"><input type="color" value={s.islandTop} onChange={(e) => set({ islandTop: e.target.value })} />Top</label>
+                  <label title="Bottom colour"><input type="color" value={s.islandBottom} onChange={(e) => set({ islandBottom: e.target.value })} />Bottom</label>
+                </span>
+              </Row>
               <Row title="Running light while music plays" desc="A light runs around the island's sides and bottom. Adaptive takes its colours from the album art."><Seg value={s.musicGlow} onChange={(v) => set({ musicGlow: v })} options={[['adaptive', 'Adaptive'], ['rainbow', 'Rainbow'], ['white', 'White'], ['off', 'Off']]} /></Row>
               <Row title="CPU, RAM and GPU" desc="Pick which usage numbers Kitty shows."><span className="minis">
                 {(['cpu', 'ram', 'gpu'] as const).map((k) => <label key={k}><Toggle on={s.stats[k]} onChange={(v) => set({ stats: { [k]: v } })} />{k.toUpperCase()}</label>)}
@@ -420,6 +433,7 @@ export default function SettingsApp() {
               <Row title="Show them in the resting notch" desc="Small numbers beside the cat while the island is closed."><Toggle on={s.statsRest} onChange={(v) => set({ statsRest: v })} /></Row>
               <Row title="Show them in the open island" desc="With a little bar for each, on the Home screen."><Toggle on={s.statsOpen} onChange={(v) => set({ statsOpen: v })} /></Row>
               <Row title="Volume bar" desc="Show the volume in the island when you change it."><Toggle on={s.volumeBar} onChange={(v) => set({ volumeBar: v })} /></Row>
+              <Row title="Song title in the notch" desc="While music plays, the title scrolls in a small capsule next to the cat."><Toggle on={s.songTicker} onChange={(v) => set({ songTicker: v })} /></Row>
               <Row title="Battery indicator" desc="Show the laptop battery next to the cat."><Toggle on={s.showBattery} onChange={(v) => set({ showBattery: v })} /></Row>
               <Row title="Battery warning" desc="Laptop and Bluetooth (headphones, mouse) almost empty."><Toggle on={s.batteryWarning} onChange={(v) => set({ batteryWarning: v })} /></Row>
               <Row title="Mic and camera dots" desc="An orange or green dot when an app is using your microphone or camera."><Toggle on={s.privacyDot} onChange={(v) => set({ privacyDot: v })} /></Row>

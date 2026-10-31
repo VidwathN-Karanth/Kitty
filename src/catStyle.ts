@@ -6,7 +6,7 @@ export const BODY = [
   { id: 'mint', name: 'Mint', c: '#a8e0c0' }, { id: 'lilac', name: 'Lilac', c: '#c3a8ee' },
 ]
 export const EYE = [
-  { id: 'mint', name: 'Mint', c: '#9be37a' }, { id: 'amber', name: 'Amber', c: '#f3b13e' },
+  { id: 'mint', name: 'Mint', c: '#98e0b4' }, { id: 'amber', name: 'Amber', c: '#f3b13e' },
   { id: 'blue', name: 'Blue', c: '#6ec6ff' }, { id: 'pink', name: 'Pink', c: '#f58fc2' },
   { id: 'purple', name: 'Purple', c: '#b79bff' }, { id: 'yellow', name: 'Yellow', c: '#f4e36a' },
   { id: 'white', name: 'White', c: '#f5f5f5' },
@@ -14,16 +14,34 @@ export const EYE = [
 export const bodyColor = (id: string) => (BODY.find((b) => b.id === id) ?? BODY[0]).c
 export const eyeColor = (id: string) => (EYE.find((b) => b.id === id) ?? EYE[0]).c
 
-export type Outfit = 'none' | 'party' | 'sunglasses' | 'crown' | 'santa' | 'witch' | 'kings'
+export type Outfit = string
 
-// Outfits earned by finishing tasks. "best" wears the highest one earned (or a seasonal one).
+// Outfits earned by finishing Claude tasks. "best" wears the highest one earned (or a seasonal one).
 export const OUTFITS = [
-  { id: 'best', name: 'Best', need: 0, emoji: '✨' },
+  { id: 'best', name: 'Best', need: 0, emoji: '\u2728' },
   { id: 'none', name: 'None', need: 0, emoji: '\u{1F6AB}' },
+  { id: 'bow', name: 'Hair bow', need: 1, emoji: '\u{1F380}' },
+  { id: 'glasses', name: 'Round glasses', need: 3, emoji: '\u{1F453}' },
   { id: 'party', name: 'Party hat', need: 5, emoji: '\u{1F973}' },
+  { id: 'bowtie', name: 'Bow tie', need: 7, emoji: '\u{1F454}' },
+  { id: 'beanie', name: 'Beanie', need: 9, emoji: '\u{1F9E2}' },
+  { id: 'collar', name: 'Bell collar', need: 12, emoji: '\u{1F514}' },
   { id: 'sunglasses', name: 'Sunglasses', need: 15, emoji: '\u{1F60E}' },
+  { id: 'scarf', name: 'Scarf', need: 18, emoji: '\u{1F9E3}' },
+  { id: 'flowers', name: 'Flower crown', need: 21, emoji: '\u{1F33C}' },
+  { id: 'headphones', name: 'Headphones', need: 24, emoji: '\u{1F3A7}' },
+  { id: 'chef', name: 'Chef hat', need: 27, emoji: '\u{1F35D}' },
   { id: 'crown', name: 'Crown', need: 30, emoji: '\u{1F451}' },
+  { id: 'heartglasses', name: 'Heart glasses', need: 35, emoji: '\u{1F496}' },
+  { id: 'bandana', name: 'Bandana', need: 40, emoji: '\u{1F535}' },
+  { id: 'tophat', name: 'Top hat', need: 50, emoji: '\u{1F3A9}' },
+  { id: 'cowboy', name: 'Cowboy hat', need: 60, emoji: '\u{1F920}' },
+  { id: 'wizard', name: 'Wizard hat', need: 75, emoji: '\u{1F9D9}' },
+  { id: 'halo', name: 'Halo', need: 100, emoji: '\u{1F607}' },
 ] as const
+
+// the artwork cat has no Santa or witch hat: it wears the closest thing it has
+export const artOutfit = (o: Outfit) => ({ santa: 'beanie', witch: 'wizard', kings: 'crown' } as Record<string, string>)[o] ?? o
 
 // Santa hat in December, witch hat around Halloween, orange crown on King's Day (27 April)
 export function seasonal(d: Date): Outfit | null {
@@ -37,10 +55,10 @@ export function seasonal(d: Date): Outfit | null {
 export function wearing(s: { outfit: string; seasonal: boolean }, total: number, d = new Date()): Outfit {
   if (s.outfit === 'best') {
     const sea = s.seasonal ? seasonal(d) : null
-    return sea ?? (total >= 30 ? 'crown' : total >= 15 ? 'sunglasses' : total >= 5 ? 'party' : 'none')
+    return sea ?? [...OUTFITS].reverse().find((o) => o.need > 0 && total >= o.need)?.id ?? 'none'
   }
   const need = OUTFITS.find((o) => o.id === s.outfit)?.need ?? 0
-  return total >= need ? (s.outfit as Outfit) : 'none'
+  return total >= need ? s.outfit : 'none'
 }
 
 export type CatLook = { body: string; eyes: string; outfit: Outfit }

@@ -1,10 +1,12 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import Outfits from './Outfits'
-import { bodyColor, eyeColor, Outfit } from './catStyle'
+import { bodyColor, eyeColor, Outfit, artOutfit } from './catStyle'
+import EYE_SPOTS from './assets/cat/eyes.json'
 
 export type Mood =
   | 'normal' | 'happy' | 'love' | 'surprised' | 'curious' | 'focused' | 'wink' | 'sad' | 'dizzy' | 'sleepy' | 'asleep'
   | 'listening' | 'angry' | 'excited' | 'crying' | 'laugh' | 'shy' | 'smug' | 'scared' | 'bored' | 'yawn'
+  | 'purr' | 'hungry' | 'thinking' | 'confused' | 'proud' | 'celebrate'
 
 // The "See emotions" list in Settings and the chat tab
 export const EMOTIONS: [Mood, string, string][] = [
@@ -12,7 +14,8 @@ export const EMOTIONS: [Mood, string, string][] = [
   ['focused', '\u{1F913}', 'Focused'], ['wink', '\u{1F609}', 'Wink'], ['sad', '\u{1F622}', 'Sad'], ['dizzy', '\u{1F635}', 'Dizzy'], ['sleepy', '\u{1F634}', 'Sleepy'],
   ['angry', '\u{1F620}', 'Angry'], ['excited', '\u{1F929}', 'Excited'], ['crying', '\u{1F62D}', 'Crying'], ['laugh', '\u{1F602}', 'Laughing'],
   ['shy', '\u{1F633}', 'Shy'], ['smug', '\u{1F60F}', 'Smug'], ['scared', '\u{1F628}', 'Scared'], ['bored', '\u{1F611}', 'Bored'], ['yawn', '\u{1F971}', 'Yawning'],
-  ['listening', '\u{1F3A7}', 'Listening'],
+  ['listening', '\u{1F3A7}', 'Listening'], ['purr', '\u{1F63B}', 'Purring'], ['hungry', '\u{1F41F}', 'Hungry'], ['thinking', '\u{1F9D0}', 'Thinking'],
+  ['confused', '\u{1F615}', 'Confused'], ['proud', '\u{1F3C5}', 'Proud'], ['celebrate', '\u{1F973}', 'Celebrating'],
 ]
 
 type Eye = 'open' | 'happy' | 'sleep' | 'love' | 'dizzy' | 'star' | 'wink'
@@ -42,6 +45,13 @@ const CFG: Record<Mood, Cfg> = {
   scared: { eye: 'open', big: true, pupil: 0.45, brow: 'sad', mouth: 'wavy', extra: 'sweat' },
   bored: { eye: 'open', lid: 0.5, mouth: 'flat' },
   yawn: { eye: 'sleep', mouth: 'yawn' },
+  // the drawn cat borrows a close face for the newer moods
+  purr: { eye: 'happy', mouth: 'smile', blush: 0.7, extra: 'hearts' },
+  hungry: { eye: 'open', big: true, brow: 'sad', mouth: 'o' },
+  thinking: { eye: 'open', brow: 'one', mouth: 'flat' },
+  confused: { eye: 'open', brow: 'sad', mouth: 'wavy' },
+  proud: { eye: 'happy', mouth: 'smile', blush: 0.4 },
+  celebrate: { eye: 'happy', mouth: 'big', blush: 0.5, extra: 'sparkles' },
 }
 
 const EYES = [{ cx: 35, cy: 46 }, { cx: 65, cy: 46 }]
@@ -189,47 +199,101 @@ const artFiles = import.meta.glob('./assets/cat/*.png', { eager: true, query: '?
 const ART: Record<string, string> = Object.fromEntries(Object.entries(artFiles).map(([k, v]) => [k.split('/').pop()!.replace('.png', ''), v]))
 export const HAS_ART = !!ART.normal
 
-// artwork frame layout (see the prompt): head width 66% of the frame, centred at 50% / 58%, ear tips at about 20%
-const OUTFIT_MAP = 'translate(50 58) scale(0.825) translate(-50 -48)'
+const wearFiles = import.meta.glob('./assets/wardrobe/*.png', { eager: true, query: '?url', import: 'default' }) as Record<string, string>
+const WEAR: Record<string, string> = Object.fromEntries(Object.entries(wearFiles).map(([k, v]) => [k.split('/').pop()!.replace('.png', ''), v]))
 
-function ArtCat({ size, follow, mood, dance, outfit, blink, wave }: { size: number; follow: boolean; mood: Mood; dance: boolean; outfit: Outfit; blink: boolean; wave: boolean }) {
+// Where each wardrobe item sits on the artwork cat, in parts of the frame (ear tips at y 0.2, eyes at 0.52, chin
+// about 0.68): x and y of the anchor, width, and whether y is the item's bottom, centre or top.
+const PLACE: Record<string, [number, number, number, 'b' | 'c' | 't']> = {
+  wizard: [0.5, 0.33, 0.66, 'b'], tophat: [0.5, 0.31, 0.5, 'b'], beanie: [0.5, 0.47, 0.7, 'b'], crown: [0.5, 0.3, 0.4, 'b'],
+  party: [0.5, 0.29, 0.26, 'b'], chef: [0.5, 0.34, 0.5, 'b'], cowboy: [0.5, 0.34, 0.74, 'b'], flowers: [0.5, 0.26, 0.66, 'c'],
+  headphones: [0.5, 0.12, 0.84, 't'], halo: [0.5, 0.09, 0.46, 'c'], bow: [0.36, 0.25, 0.26, 'c'],
+  glasses: [0.5, 0.53, 0.6, 'c'], sunglasses: [0.5, 0.53, 0.6, 'c'], heartglasses: [0.5, 0.53, 0.6, 'c'],
+  bowtie: [0.5, 0.73, 0.28, 'c'], collar: [0.5, 0.64, 0.5, 't'], scarf: [0.5, 0.6, 0.62, 't'], bandana: [0.5, 0.62, 0.5, 't'],
+}
+
+// Look frames and their direction, used when there is no "eyes-blank" frame to draw moving pupils on.
+const LOOKS: [string, number, number][] = [['look-left', -1, 0], ['look-right', 1, 0], ['look-down', 0, 1], ['look-down-left', -0.72, 0.72], ['look-down-right', 0.72, 0.72]]
+type Spot = { x: number; y: number; r: number }
+const EYE_ART = ART['eyes-blank'] && (EYE_SPOTS as Spot[]).length === 2 ? (EYE_SPOTS as Spot[]) : null
+
+function ArtCat({ size, follow, mood, dance, outfit, blink, wave, eyes }: { size: number; follow: boolean; mood: Mood; dance: boolean; outfit: Outfit; blink: boolean; wave: boolean; eyes: string }) {
   const box = useRef<HTMLDivElement>(null)
-  const [dir, setDir] = useState<'' | 'left' | 'right' | 'up' | 'down'>('')
-  const [blinking, setBlinking] = useState(false)
+  const head = useRef<HTMLDivElement>(null)
+  const pupils = useRef<(SVGGElement | null)[]>([])
+  const [dir, setDir] = useState('')
+  const [lid, setLid] = useState('') // '' | 'half-blink' | 'blink'
 
   useEffect(() => { Object.values(ART).forEach((u) => { const i = new Image(); i.src = u }) }, []) // no flicker when swapping
 
-  // look where the cursor is: pick the nearest of the four "look" frames
+  // Follow the cursor: the head leans and turns a little towards it, and the pupils move to look at it
+  // (drawn pupils glide anywhere except up; without the blank-eyes frame, the nearest "look" frame fades in).
   useEffect(() => {
-    if (!follow) { setDir(''); return }
-    return window.kitty.onCursor(({ x, y }) => {
+    const reset = () => { if (head.current) head.current.style.transform = ''; pupils.current.forEach((p) => { if (p) p.style.transform = '' }); setDir('') }
+    if (!follow) { reset(); return }
+    const off = window.kitty.onCursor(({ x, y }) => {
       const r = box.current?.getBoundingClientRect()
       if (!r) return
-      const dx = x - (r.left + r.width / 2), dy = y - (r.top + r.height / 2)
-      const next = Math.hypot(dx, dy) < 90 ? '' : Math.abs(dx) > Math.abs(dy) * 1.2 ? (dx < 0 ? 'left' : 'right') : dy < 0 ? 'up' : 'down'
-      setDir((d) => (d === next ? d : next))
+      const dx = x - (r.left + r.width / 2), dy = y - (r.top + r.height / 2), d = Math.hypot(dx, dy) || 1
+      const k = Math.min(1, d / 260), nx = (dx / d) * k, ny = (dy / d) * k
+      if (head.current) head.current.style.transform = `translate(${nx * size * 0.06}px, ${ny * size * 0.045}px) rotate(${nx * 6}deg)`
+      if (EYE_ART) {
+        const R = EYE_ART[0].r * size * 0.42, kk = Math.min(1, d / 120)
+        pupils.current.forEach((p) => { if (p) p.style.transform = `translate(${(dx / d) * kk * R}px, ${Math.max(-0.1 * R, (dy / d) * kk * R)}px)` })
+        return
+      }
+      let best = '', score = 0.55
+      if (d > 70) for (const [name, vx, vy] of LOOKS) { if (!ART[name]) continue; const s = (dx / d) * vx + (dy / d) * vy; if (s > score) { score = s; best = name } }
+      setDir((cur) => (cur === best ? cur : best))
     })
-  }, [follow])
+    return () => { off(); reset() }
+  }, [follow, size])
 
-  // blink every few seconds
+  // blink every few seconds: half closed, closed, half closed
   useEffect(() => {
     if (!blink || !ART.blink) return
     let t: number
-    const loop = () => { t = window.setTimeout(() => { setBlinking(true); window.setTimeout(() => setBlinking(false), 130); loop() }, 3500 + Math.random() * 3000) }
+    const half = ART['half-blink'] ? 'half-blink' : 'blink'
+    const loop = () => {
+      t = window.setTimeout(() => {
+        setLid(half); window.setTimeout(() => setLid('blink'), 50); window.setTimeout(() => setLid(half), 140); window.setTimeout(() => setLid(''), 190)
+        loop()
+      }, 3500 + Math.random() * 3000)
+    }
     loop()
     return () => clearTimeout(t)
   }, [blink])
 
   const calm = mood === 'normal'
-  const frame = wave && ART.wave ? 'wave' : calm && blinking && ART.blink ? 'blink' : calm && dir && ART['look-' + dir] ? 'look-' + dir : ART[mood] ? mood : 'normal'
+  const frame = wave && ART.wave ? 'wave' : calm && lid ? lid : calm && EYE_ART ? 'eyes-blank' : calm && dir ? dir : ART[mood] ? mood : 'normal'
+  // every frame we might show is stacked; only the current one is visible, so switching is a quick cross-fade
+  const layers = Array.from(new Set(['normal', ...(EYE_ART ? ['eyes-blank', 'blink', 'half-blink'] : LOOKS.map((l) => l[0])).filter((n) => ART[n]), frame]))
+  const img = { position: 'absolute', left: 0, top: -size * 0.1, width: size, height: size, objectFit: 'contain', userSelect: 'none', transition: 'opacity 90ms ease' } as const
+  const item = artOutfit(outfit), place = PLACE[item]
   return (
     <div ref={box} className={dance ? 'dance' : ''} style={{ position: 'relative', width: size, height: size * 0.8, flexShrink: 0 }}>
-      <img src={ART[frame]} alt="" draggable={false} style={{ position: 'absolute', left: 0, top: -size * 0.1, width: size, height: size, objectFit: 'contain', userSelect: 'none' }} />
-      {size >= 60 && outfit !== 'none' && (
-        <svg viewBox="0 0 100 100" style={{ position: 'absolute', left: 0, top: -size * 0.1, width: size, height: size, overflow: 'visible' }}>
-          <g transform={OUTFIT_MAP}><Outfits outfit={outfit} /></g>
-        </svg>
-      )}
+      <div ref={head} style={{ position: 'absolute', inset: 0, transition: 'transform 180ms cubic-bezier(.22,1,.36,1)', transformOrigin: '50% 80%' }}>
+        {layers.map((n) => <img key={n} src={ART[n]} alt="" draggable={false} style={{ ...img, opacity: n === frame ? 1 : 0 }} />)}
+        {EYE_ART && (
+          <svg viewBox={`0 0 ${size} ${size}`} style={{ position: 'absolute', left: 0, top: -size * 0.1, width: size, height: size, opacity: frame === 'eyes-blank' ? 1 : 0, transition: 'opacity 90ms ease', pointerEvents: 'none' }}>
+            {EYE_ART.map((e, i) => {
+              const R = e.r * size
+              return (
+                <g key={i} transform={`translate(${e.x * size} ${e.y * size})`}>
+                  <circle r={R * 1.02} fill={eyeColor(eyes)} />
+                  <g ref={(el) => { pupils.current[i] = el }} style={{ transition: 'transform 160ms cubic-bezier(.22,1,.36,1)' }}>
+                    <circle r={R * 0.56} fill="#3b1d12" />
+                    <circle cx={R * 0.2} cy={-R * 0.22} r={R * 0.2} fill="#fff" />
+                  </g>
+                </g>
+              )
+            })}
+          </svg>
+        )}
+        {size >= 60 && place && WEAR[item] && (
+          <img src={WEAR[item]} alt="" draggable={false} style={{ position: 'absolute', left: (place[0] - place[2] / 2) * size, top: -size * 0.1 + place[1] * size, width: place[2] * size, transform: place[3] === 'b' ? 'translateY(-100%)' : place[3] === 'c' ? 'translateY(-50%)' : '', pointerEvents: 'none' }} />
+        )}
+      </div>
     </div>
   )
 }
@@ -237,6 +301,6 @@ function ArtCat({ size, follow, mood, dance, outfit, blink, wave }: { size: numb
 // The cat everyone imports: artwork when it has been added, otherwise the drawn one
 export default function Cat(props: CatProps) {
   return HAS_ART
-    ? <ArtCat size={props.size ?? 36} follow={props.follow ?? true} mood={props.mood ?? 'normal'} dance={props.dance ?? false} outfit={props.outfit ?? 'none'} blink={props.blink ?? true} wave={props.wave ?? false} />
+    ? <ArtCat size={props.size ?? 36} follow={props.follow ?? true} mood={props.mood ?? 'normal'} dance={props.dance ?? false} outfit={props.outfit ?? 'none'} blink={props.blink ?? true} wave={props.wave ?? false} eyes={props.eyes ?? 'mint'} />
     : <VectorCat {...props} />
 }

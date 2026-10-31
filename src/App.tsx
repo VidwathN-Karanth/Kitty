@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Settings as Gear, Volume2, VolumeX, Plane, Mic, Video, LayoutGrid } from 'lucide-react'
 import { TABS, TabId } from './tabs'
@@ -12,7 +12,7 @@ import Chat from './Chat'
 import Bars from './Bars'
 import RunningLight from './RunningLight'
 import Battery from './Battery'
-import Stats, { statItems } from './Stats'
+import Stats from './Stats'
 import StatusDot from './StatusDot'
 import Confetti from './Confetti'
 import Volume from './Volume'
@@ -29,6 +29,16 @@ import { sounds, setSoundLevel } from './sound'
 type Hud = 'vol' | 'air' | 'hi' | null
 
 // A MacBook-style notch: flat against the top edge, rounded at the bottom, with small concave "ears" at the top corners
+// Song title running through a small capsule, like a sign board. The capsule takes the album's colour.
+function Ticker({ text, color }: { text: string; color: string }) {
+  const bg = color ? `color-mix(in oklab, ${color} 78%, #000)` : '#2a2a2e'
+  return (
+    <span className="ticker" style={{ background: bg }} title={text}>
+      <span className="ticker-run" style={{ animationDuration: `${Math.max(6, text.length * 0.32)}s` }}>{text}<i />{text}<i /></span>
+    </span>
+  )
+}
+
 const SIZE = {
   closed: { width: 262, height: 34 }, hudVol: { width: 244, height: 34 }, hudAir: { width: 262, height: 34 }, hudHi: { width: 280, height: 34 },
   open: { width: 640, height: 300 },
@@ -39,7 +49,7 @@ const SPRINGS = {
 } as const
 const TAN = '#c9a574'
 // the "little trick" the cat does when you open an app
-const TRICKS: Partial<Record<TabId, Mood>> = { claude: 'focused', music: 'happy', chat: 'curious', focus: 'focused', tray: 'surprised', clipboard: 'curious', note: 'wink' }
+const TRICKS: Partial<Record<TabId, Mood>> = { claude: 'focused', music: 'happy', chat: 'thinking', focus: 'focused', tray: 'surprised', clipboard: 'curious', note: 'wink' }
 const OUTFIT_STEPS = [5, 15, 30]
 
 export default function App() {
@@ -90,7 +100,7 @@ export default function App() {
     } else {
       if (c.sounds) e.type === 'question' ? sounds.question() : sounds.done()
       if (c.notifications && e.type === 'question') new Notification('Claude Code', { body: `${e.project}: ${e.message ?? 'needs you'}` })
-      if (e.type === 'done' && (e.ms ?? 0) > 10 * 60000) { confetti(); showMood('excited', 4000) } // a long task deserves a party
+      if (e.type === 'done' && (e.ms ?? 0) > 10 * 60000) { confetti(); showMood('celebrate', 4000) } // a long task deserves a party
     }
     if (e.type !== 'question' || !c.apps.claude || !c.peekOnQuestion) return // finished or failed: just the sound and the dot
     setTab('claude'); peek(8000)
@@ -159,7 +169,7 @@ export default function App() {
     if (!loaded) return
     const t = claude.stats.total
     if (prevTotal.current !== null && OUTFIT_STEPS.some((n) => prevTotal.current! < n && t >= n)) {
-      confetti(); showMood('excited', 4000)
+      confetti(); showMood('celebrate', 4000)
       if (cfg.current.sounds) sounds.fanfare()
       if (cfg.current.notifications) new Notification('New outfit!', { body: `${cfg.current.name} earned something new to wear` })
     }
@@ -254,7 +264,7 @@ export default function App() {
     else if (kind === 'air-on' || kind === 'air-off') { setFakeAir(kind === 'air-on'); setTimeout(() => setFakeAir(null), 8000) }
     else if (kind === 'vol') flash('vol')
     else if (kind === 'hi') flash('hi', 2800)
-    else if (kind === 'confetti') { confetti(); showMood('excited', 4000) }
+    else if (kind === 'confetti') { confetti(); showMood('celebrate', 4000) }
     else if (kind === 'usage') { showMood('scared', 4000); peek(5000) }
   }), [])
 
@@ -273,13 +283,13 @@ export default function App() {
   const wantMood: Mood = demo
     ?? (cs.some((s) => s.state === 'question') ? 'surprised'
       : cs.some((s) => s.state === 'error' && s.endedAt && ms - s.endedAt < 15000) ? 'sad'
-      : cs.some((s) => s.state === 'done' && s.endedAt && ms - s.endedAt < 6000) ? 'happy'
+      : cs.some((s) => s.state === 'done' && s.endedAt && ms - s.endedAt < 6000) ? 'proud'
       : m.playing && settings.dancing ? 'listening'
       : cs.some((s) => s.state === 'working') ? 'focused'
       : hud === 'hi' ? 'happy'
       : trick
       ?? (asleep ? 'asleep' : drowsy ? 'sleepy'
-      : settings.hunger && claude.stats.hunger < 10 ? 'sad'
+      : settings.hunger && claude.stats.hunger < 10 ? 'hungry'
       : 'normal'))
   const mood: Mood = settings.faces || demo ? wantMood : 'normal' // "Faces" off = plain eyes (except when you try one out)
   const dance = settings.dancing && mood === 'listening'
@@ -292,6 +302,37 @@ export default function App() {
   const [t1, t2] = cur.id === 'chat' ? [`${settings.name} `, 'Chat'] : cur.title
   const priv = settings.privacyDot ? media.priv : undefined
   const volIcon = media.vol?.mute || !media.vol?.v ? <VolumeX size={18} /> : <Volume2 size={18} />
+
+  // Resting notch is only as wide as what it shows: the cat in the middle, and the wider of the two sides on both sides
+  const leftEl = useRef<HTMLSpanElement>(null), rightEl = useRef<HTMLSpanElement>(null)
+  const [restW, setRestW] = useState(SIZE.closed.width)
+  useLayoutEffect(() => {
+    if (open || hud) return
+    const used = (el: HTMLElement | null, gap: number) => {
+      const kids = [...(el?.children ?? [])].filter((k) => !k.classList.contains('grow')) as HTMLElement[]
+      return kids.reduce((w, k) => w + k.offsetWidth, 0) + Math.max(0, kids.length - 1) * gap
+    }
+    const side = Math.max(used(leftEl.current, 6), used(rightEl.current, 8))
+    const w = Math.max(116, 28 + 34 + 2 * (side ? side + 10 : 12))
+    setRestW((cur) => (Math.abs(cur - w) < 2 ? cur : w))
+  })
+  // Petting: rub the cursor over the cat and it purrs (hearts float up, love face)
+  const [hearts, setHearts] = useState<{ id: number; x: number }[]>([])
+  const rub = useRef({ d: 0, t: 0, last: 0, x: 0, y: 0 })
+  const pet = (e: React.MouseEvent) => {
+    const r = rub.current, now = performance.now()
+    if (now - r.t > 600) r.d = 0
+    else r.d += Math.abs(e.clientX - r.x) + Math.abs(e.clientY - r.y)
+    r.t = now; r.x = e.clientX; r.y = e.clientY
+    if (r.d > 70 && now - r.last > 260) {
+      r.d = 0; r.last = now
+      const id = now
+      setHearts((h) => [...h.slice(-5), { id, x: Math.random() * 30 - 15 }])
+      window.setTimeout(() => setHearts((h) => h.filter((x) => x.id !== id)), 1100)
+      showMood('purr', 1800)
+    }
+  }
+  const ticker = !open && !hud && settings.songTicker && m.playing && m.title
 
   // left slot of the collapsed notch: what is being flashed, else small status icons that stay (plane, mic, camera)
   const leftIcons = !open && (
@@ -306,8 +347,9 @@ export default function App() {
       <motion.div
         ref={island}
         className="island"
+        style={{ ['--isl' as string]: settings.islandTop }}
         initial={false}
-        animate={open ? SIZE.open : hud === 'vol' ? SIZE.hudVol : hud === 'air' ? SIZE.hudAir : hud === 'hi' ? SIZE.hudHi : { width: SIZE.closed.width + (settings.statsRest ? statItems(sys, settings.stats).length * 56 : 0), height: SIZE.closed.height }}
+        animate={open ? SIZE.open : hud === 'vol' ? SIZE.hudVol : hud === 'air' ? SIZE.hudAir : hud === 'hi' ? SIZE.hudHi : { width: restW, height: SIZE.closed.height }}
         transition={spring}
         onMouseEnter={() => { hovered.current = true; setHud(null); setOpen(true) }}
         onDragEnter={() => { setOpen(true); setTab('tray') }}
@@ -319,22 +361,26 @@ export default function App() {
           initial={false}
           animate={{ borderBottomLeftRadius: open ? 34 : 16, borderBottomRightRadius: open ? 34 : 16 }}
           transition={spring}
-          style={{ background: tab === 'music' && open && bg.length ? musicBackground(bg) : tab === 'music' && open && tint ? `linear-gradient(180deg, #000 30%, ${tint})` : '#000', transition: 'background 600ms' }}
+          style={{ background: tab === 'music' && open && bg.length ? musicBackground(bg) : tab === 'music' && open && tint ? `linear-gradient(180deg, #000 30%, ${tint})` : `linear-gradient(180deg, ${settings.islandTop}, ${settings.islandBottom})`, transition: 'background 600ms' }}
         >
           {media.state.playing && settings.musicGlow !== 'off' && <RunningLight mode={settings.musicGlow} palette={settings.musicGlow === 'rainbow' ? RAINBOW : palette} />}
           <div className={'bar' + (hud && !open ? ' compact' : !open ? ' rest' : '')}>
-            <span className="title">{leftIcons}{open && tab !== 'home' && <>{t1}<span style={{ color: cur.color }}>{t2}</span></>}</span>
+            <span className="title" ref={leftEl}>{leftIcons}{open && tab !== 'home' && <>{t1}<span style={{ color: cur.color }}>{t2}</span></>}</span>
             <span className="mid">
+              <span className="pet" onMouseMove={pet}>
+                {hearts.map((h) => <i key={h.id} className="heart" style={{ ['--hx' as string]: h.x + 'px' }}>♥</i>)}
               <Cat size={34} follow={settings.follow} light={light?.color} mood={mood} dance={dance} blink={settings.blinking} wave={hud === 'hi'} body={look.body} eyes={look.eyes} />
+              </span>
               {open && settings.showBattery && laptop && <Battery level={laptop.level} charging={laptop.charging} />}
               {open && settings.apps.clock && <span className="clock">{date} <b>{time}</b></span>}
             </span>
-            <span className="right">
+            <span className="right" ref={rightEl}>
               {hud === 'air' && !open ? <span className="hud"><b className="air-t">Airplane mode {air ? 'on' : 'off'}</b></span>
                 : hud === 'hi' && !open ? <span className="hud"><b className="air-t">Hi, I&apos;m {settings.name}!</b></span>
                 : hud === 'vol' && !open ? <span className="hud"><span className="hud-track"><i style={{ width: `${(media.vol?.mute ? 0 : media.vol?.v ?? 0) * 100}%` }} /></span><b>{Math.round((media.vol?.mute ? 0 : media.vol?.v ?? 0) * 100)}</b></span>
                 : <>
                     {!open && settings.showBattery && laptop && <Battery level={laptop.level} charging={laptop.charging} />}
+                    {ticker && <Ticker text={[m.title, m.artist].filter(Boolean).join(' · ')} color={bg[0] ?? tint} />}
                     <span className="grow" />
                     {open && air && <Plane size={16} color="#ffb04a" aria-label="Airplane mode" />}
                     {open && priv?.mic && <span className="pdot mic"><Mic size={11} /></span>}

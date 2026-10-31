@@ -12,6 +12,7 @@ type Settings = {
   follow: boolean; faces: boolean; blinking: boolean; dancing: boolean; sleepEffect: boolean; sleepMins: number; startupAnim: boolean; appAnim: boolean; hunger: boolean
   bodyColor: string; eyeColor: string; outfit: string; seasonal: boolean
   lightPreset: string; lightWork: string; lightDone: string; lightError: string
+  islandTop: string; islandBottom: string; songTicker: boolean
   sounds: boolean; soundLevel: 'soft' | 'normal' | 'loud'; notifications: boolean; confetti: boolean; warnAt: number; usageBudget: number
   musicGlow: 'adaptive' | 'rainbow' | 'white' | 'off'; speed: 'fast' | 'normal'; volumeBar: boolean; showBattery: boolean; batteryWarning: boolean; privacyDot: boolean; weatherCity: string; calendarUrl: string
   startWithWindows: boolean; testMode: boolean

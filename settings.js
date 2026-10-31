@@ -22,7 +22,7 @@ const DEFAULTS = {
   hunger: true,
   bodyColor: 'orange', eyeColor: 'mint', outfit: 'best', seasonal: true,
   // traffic-light colours (what the status dot and eyes show)
-  lightPreset: 'classic', lightWork: '#f0a030', lightDone: '#5fe05f', lightError: '#e5483d',
+  lightPreset: 'neon', lightWork: '#ffe600', lightDone: '#39ff14', lightError: '#ff1744',
 
   // sounds & notifications
   sounds: true, soundLevel: 'normal', notifications: true, confetti: true,
@@ -31,6 +31,8 @@ const DEFAULTS = {
 
   // island
   musicGlow: 'adaptive', // running light around the island while music plays: adaptive | rainbow | white | off
+  islandTop: '#000000', islandBottom: '#000000', // island background (same = solid, different = gradient)
+  songTicker: true,       // scrolling song title next to the cat while music plays
   speed: 'fast', volumeBar: true, showBattery: true, batteryWarning: true, privacyDot: true,
   weatherCity: '', calendarUrl: '',
   startWithWindows: true, // starts with Windows and shows in Windows' Startup apps list
@@ -61,6 +63,8 @@ function load(dir) {
   try { current = merge(DEFAULTS, JSON.parse(fs.readFileSync(file, 'utf8'))) } catch {}
   // one-time switch-on for people whose settings were saved while the default was still "off"
   if (!current.autostartSet) { current = { ...current, startWithWindows: true, autostartSet: true }; save() }
+  // one-time move from the old default lights to neon (custom colours are kept)
+  if (!current.neonSet) { if (current.lightPreset === 'classic') current = { ...current, lightPreset: 'neon', lightWork: '#ffe600', lightDone: '#39ff14', lightError: '#ff1744' }; current.neonSet = true; save() }
 }
 function save() {
   try { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, JSON.stringify(current, null, 2)) } catch (e) { console.log('[settings]', e.message) }

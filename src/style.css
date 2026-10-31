@@ -413,3 +413,8 @@ button:focus-visible, [role='button']:focus-visible { outline: 2px solid #ffffff
 
 /* short messages in the notch (greeting, airplane mode) stay on one line; the notch grows to fit them */
 .hud, .bar.compact > * { white-space: nowrap; flex-shrink: 0; }
+
+/* the ••• menu always fits inside the open island: one line per item, and it scrolls if it ever has to */
+.menu { width: 236px; max-height: 250px; overflow-y: auto; scrollbar-width: none; }
+.menu button, .menu .err { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.menu button { flex-shrink: 0; }

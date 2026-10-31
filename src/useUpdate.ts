@@ -17,7 +17,7 @@ export function updateLabel(u: UpdateStatus) {
     case 'downloading': return `Downloading update ${u.percent ?? 0}%`
     case 'ready': return `Restart & update to v${u.version}`
     case 'uptodate': return `Up to date · v${u.current}`
-    case 'error': return 'Update check failed · retry'
+    case 'error': return 'Retry update check'
     default: return 'Check for updates'
   }
 }

@@ -32,7 +32,8 @@ function start(onStatus) {
     .on('update-not-available', () => set({ state: 'uptodate' }))
     .on('download-progress', (p) => set({ state: 'downloading', percent: Math.round(p.percent) }))
     .on('update-downloaded', (i) => set({ state: 'ready', version: i.version }))
-    .on('error', (e) => set({ state: 'error', error: friendly(e) }))
+    // no release on GitHub yet is not a failure: there is simply nothing newer than this version
+    .on('error', (e) => set(/No published versions|\b404\b/i.test(String(e?.message ?? e)) ? { state: 'uptodate', error: undefined } : { state: 'error', error: friendly(e) }))
   check()
   setInterval(check, 6 * 3600 * 1000)
 }

@@ -50,7 +50,6 @@ function create() {
   })
   win.setAlwaysOnTop(true, 'screen-saver')
   win.setIgnoreMouseEvents(true, { forward: true })
-  win.setContentProtection(true) // left out of screenshots, screen recordings and screen sharing
   // Other "always on top" windows (fullscreen apps, players, popups) can still land above the island. Take the top
   // spot back right away when that happens, and check again every second (moveTop never steals the keyboard focus).
   const home = { width: W, height: H, x: Math.round(x + (width - W) / 2), y: 0 }
@@ -251,7 +250,7 @@ function startMedia() {
         else if (m.type === 'vol') media.vol = { v: m.v, mute: m.mute }
         else if (m.type === 'art') media.art = { mime: m.mime, data: m.data }
         else if (m.type === 'gpu') { sysStats.gpu = m.gpu; continue }
-        else if (m.type === 'windrag') { windowDrag(m.on); continue }
+        else if (m.type === 'windrag' || m.type === 'snip') { stepAside(m.type, m.on); continue }
         else { if (!m.active) media.art = null; media.state = { ...m, at: Date.now() } }
         pushMedia()
       } catch {}
@@ -259,13 +258,18 @@ function startMedia() {
   })
   helper.on('exit', () => { helper = null; if (!quitting && !paused) setTimeout(startMedia, 3000) })
 }
-// Someone is dragging a window (maybe to the top for Snap layouts): fold the island and step aside until they let go.
-// It turns invisible and lets every click and hover through (no mouse events reach it, so it can't open either).
+// The island steps aside while someone drags a window (maybe to the top for Snap layouts) or while a screenshot tool
+// is selecting an area: it folds, turns invisible and lets every click and hover through (so it can't open either).
+// It is still in the screenshot itself: those tools freeze the screen before showing their overlay.
+const aside = new Set()
 let dragHidden = false
-function windowDrag(on) {
-  if (!win || win.isDestroyed() || on === dragHidden) return
-  dragHidden = on
-  if (on) { win.webContents.send('fold'); win.setOpacity(0); win.setIgnoreMouseEvents(true); ignoring = true }
+function stepAside(reason, on) {
+  if (!win || win.isDestroyed()) return
+  on ? aside.add(reason) : aside.delete(reason)
+  const hide = aside.size > 0
+  if (hide === dragHidden) return
+  dragHidden = hide
+  if (hide) { win.webContents.send('fold'); win.setOpacity(0); win.setIgnoreMouseEvents(true); ignoring = true }
   else { win.setOpacity(1); win.setIgnoreMouseEvents(true, { forward: true }) }
 }
 let quitting = false

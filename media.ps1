@@ -8,6 +8,7 @@ $null = [Windows.Storage.Streams.IRandomAccessStreamWithContentType, Windows.Sto
 $null = [Windows.Storage.Streams.IInputStream, Windows.Storage.Streams, ContentType = WindowsRuntime]
 # Window drags: while the left button is held and the active window moves, someone is dragging a window (maybe to
 # the top of the screen for Snap layouts). Reported as {"type":"windrag","on":true/false} so the island steps aside.
+# The same watcher reports a screenshot tool's selection overlay in front as {"type":"snip","on":...}.
 Add-Type -TypeDefinition @'
 using System; using System.Runtime.InteropServices; using System.Threading;
 public static class WinDrag {
@@ -15,12 +16,31 @@ public static class WinDrag {
   [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
   [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr h, out RECT r);
   [StructLayout(LayoutKind.Sequential)] struct RECT { public int L, T, R, B; }
+  [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+  [DllImport("user32.dll")] static extern int GetSystemMetrics(int i);
+  static readonly string[] Snippers = { "screenclippinghost", "snippingtool", "screensketch", "sharex", "greenshot", "lightshot", "snagit32", "snagitcapture", "snagiteditor", "picpick" };
+  // a known screenshot tool, with a window covering the whole screen (its selection overlay, not its normal window)
+  static bool IsSnipOverlay(IntPtr h) {
+    try {
+      uint pid; GetWindowThreadProcessId(h, out pid);
+      string name = System.Diagnostics.Process.GetProcessById((int)pid).ProcessName.ToLowerInvariant();
+      if (Array.IndexOf(Snippers, name) < 0) return false;
+      RECT r; GetWindowRect(h, out r);
+      return r.R - r.L >= GetSystemMetrics(0) && r.B - r.T >= GetSystemMetrics(1);
+    } catch { return false; }
+  }
   public static void Start() {
     var t = new Thread(() => {
-      bool down = false, drag = false; IntPtr w = IntPtr.Zero; RECT r0 = new RECT();
+      bool down = false, drag = false, snip = false; IntPtr w = IntPtr.Zero, lastFg = IntPtr.Zero; RECT r0 = new RECT(); int tick = 0;
       while (true) {
         bool now = (GetAsyncKeyState(1) & 0x8000) != 0;
         IntPtr fg = GetForegroundWindow();
+        // a screenshot tool's full-screen selection overlay is in front: the island steps aside so it is not in the way
+        if (fg != lastFg || ++tick % 12 == 0) {
+          lastFg = fg;
+          bool s = IsSnipOverlay(fg);
+          if (s != snip) { snip = s; Console.Out.WriteLine(s ? "{\"type\":\"snip\",\"on\":true}" : "{\"type\":\"snip\",\"on\":false}"); Console.Out.Flush(); }
+        }
         // a click on an inactive window activates it a moment later: follow whichever window is active
         if (now && (!down || fg != w)) { w = fg; GetWindowRect(w, out r0); }
         else if (now && !drag) {

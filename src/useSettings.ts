@@ -7,7 +7,7 @@ export const DEFAULT_SETTINGS: Settings = {
   lightPreset: 'neon', lightWork: '#ffe600', lightDone: '#39ff14', lightError: '#ff1744',
   islandTop: '#000000', islandBottom: '#000000', songTicker: true,
   sounds: true, soundLevel: 'normal', notifications: true, confetti: true, warnAt: 80, usageBudget: 1000000,
-  musicGlow: 'adaptive', speed: 'fast', volumeBar: true, showBattery: true, showWifi: true, showBluetooth: true, showSpeaker: true, batteryWarning: true, privacyDot: true, weatherCity: '', calendarUrl: '',
+  musicGlow: 'adaptive', speed: 'fast', volumeBar: true, showBattery: true, showWifi: true, showBluetooth: true, showSpeaker: true, notchMode: 'auto', notchLeft: [], notchRight: [], batteryWarning: true, privacyDot: true, weatherCity: '', calendarUrl: '',
   startWithWindows: true, testMode: false,
   stats: { cpu: true, ram: true, gpu: true }, statsRest: true, statsOpen: true, peekOnQuestion: true,
   shortcuts: { open: 'Ctrl+Alt+T', home: 'Ctrl+Alt+Shift+1', music: 'Ctrl+Alt+Shift+2', claude: 'Ctrl+Alt+Shift+3', focus: 'Ctrl+Alt+Shift+4', clipboard: 'Ctrl+Alt+Shift+5', note: 'Ctrl+Alt+Shift+6' },

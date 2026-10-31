@@ -34,7 +34,8 @@ const DEFAULTS = {
   islandTop: '#000000', islandBottom: '#000000', // island background (same = solid, different = gradient)
   songTicker: true,       // scrolling song title next to the cat while music plays
   speed: 'fast', volumeBar: true, showBattery: true,
-  showWifi: true, showBluetooth: true, showSpeaker: true, // status icons left of CPU in the resting notch
+  showWifi: true, showBluetooth: true, showSpeaker: true, // status icons in the resting notch
+  notchMode: 'auto', notchLeft: [], notchRight: [], // closed island: balanced automatically, or the user's order (src/notch.ts)
   batteryWarning: true, privacyDot: true,
   weatherCity: '', calendarUrl: '',
   startWithWindows: true, // starts with Windows and shows in Windows' Startup apps list

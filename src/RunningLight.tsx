@@ -13,7 +13,6 @@ export default function RunningLight({ mode, palette }: { mode: 'adaptive' | 'ra
   return (
     <span className={'runlight ' + mode} aria-hidden>
       <i className="rl-blend"><b style={{ background: blend }} /></i>
-      <i className="rl-blend soft"><b style={{ background: blend }} /></i>
       <i className="rl-comet"><b style={{ background: comet }} /></i>
     </span>
   )

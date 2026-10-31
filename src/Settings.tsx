@@ -18,6 +18,7 @@ import { useInfo } from './useInfo'
 import { BODY, EYE, OUTFITS, wearing } from './catStyle'
 import { sounds, setSoundLevel } from './sound'
 import './settings.css'
+import NotchEditor from './NotchEditor'
 
 const PAGES = [
   { id: 'home', label: 'Home', icon: Home, group: 0 },
@@ -438,13 +439,16 @@ export default function SettingsApp() {
               <Row title="Show them in the open island" desc="With a little bar for each, on the Home screen."><Toggle on={s.statsOpen} onChange={(v) => set({ statsOpen: v })} /></Row>
               <Row title="Volume bar" desc="Show the volume in the island when you change it."><Toggle on={s.volumeBar} onChange={(v) => set({ volumeBar: v })} /></Row>
               <Row title="Song title in the notch" desc="While music plays, the title scrolls in a small capsule next to the cat."><Toggle on={s.songTicker} onChange={(v) => set({ songTicker: v })} /></Row>
-              <Row title="Wi-Fi, Bluetooth and speaker" desc="Small status icons left of CPU in the resting notch. Dimmed and crossed out when off.">
+              <Row title="Wi-Fi, Bluetooth and speaker" desc="Small status icons in the closed island. Dimmed and crossed out when off.">
                 <span className="minis">
                   <label><Toggle on={s.showWifi} onChange={(v) => set({ showWifi: v })} />Wi-Fi</label>
                   <label><Toggle on={s.showBluetooth} onChange={(v) => set({ showBluetooth: v })} />Bluetooth</label>
                   <label><Toggle on={s.showSpeaker} onChange={(v) => set({ showSpeaker: v })} />Speaker</label>
                 </span>
               </Row>
+              <div className="row col"><div><b>Closed island layout</b><p>What sits on each side of the cat. Drag to rearrange.</p></div>
+                <NotchEditor s={s} set={set} />
+              </div>
               <Row title="Battery indicator" desc="Show the laptop battery next to the cat."><Toggle on={s.showBattery} onChange={(v) => set({ showBattery: v })} /></Row>
               <Row title="Battery warning" desc="Laptop and Bluetooth (headphones, mouse) almost empty."><Toggle on={s.batteryWarning} onChange={(v) => set({ batteryWarning: v })} /></Row>
               <Row title="Mic and camera dots" desc="An orange or green dot when an app is using your microphone or camera."><Toggle on={s.privacyDot} onChange={(v) => set({ privacyDot: v })} /></Row>

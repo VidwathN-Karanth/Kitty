@@ -129,3 +129,19 @@ body.sw-body { background: #0d0f12; overflow: hidden; }
 .sw .isl-pick > button.on { border-color: var(--lime); }
 .sw .isl-pick label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--mut); cursor: pointer; }
 .sw .isl-pick input[type=color] { width: 30px; height: 28px; border: 0; padding: 0; background: none; cursor: pointer; }
+
+/* closed island layout editor */
+.sw .ne { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.sw .ne-island { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; background: #000;
+  border-radius: 0 0 26px 26px; padding: 10px 14px; min-height: 52px; }
+.sw .ne-side { display: flex; flex-wrap: nowrap; gap: 6px; min-height: 36px; align-items: center; border-radius: 12px; padding: 4px; transition: background 120ms; }
+.sw .ne-side.l { justify-content: flex-end; }
+.sw .ne-side.r { justify-content: flex-start; }
+.sw .ne-side.over { background: #ffffff14; box-shadow: inset 0 0 0 1px #cfe89a66; }
+.sw .ne-chip { display: inline-grid; place-items: center; width: 32px; height: 32px; flex-shrink: 0; border-radius: 10px; background: #1f2227; color: #e8e8ea; font-size: 12px;
+  cursor: grab; user-select: none; box-shadow: inset 0 0 0 1px #ffffff1a; }
+.sw .ne-chip:active { cursor: grabbing; }
+.sw .ne-cat { display: grid; place-items: center; }
+.sw .ne-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--mut); font-size: 13px; }
+.sw .ne-key { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--mut); font-size: 12px; }
+.sw .ne-key span { display: inline-flex; align-items: center; gap: 5px; }

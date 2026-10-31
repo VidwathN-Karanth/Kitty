@@ -14,7 +14,7 @@ type Settings = {
   lightPreset: string; lightWork: string; lightDone: string; lightError: string
   islandTop: string; islandBottom: string; songTicker: boolean
   sounds: boolean; soundLevel: 'soft' | 'normal' | 'loud'; notifications: boolean; confetti: boolean; warnAt: number; usageBudget: number
-  musicGlow: 'adaptive' | 'rainbow' | 'white' | 'off'; speed: 'fast' | 'normal'; volumeBar: boolean; showBattery: boolean; showWifi: boolean; showBluetooth: boolean; showSpeaker: boolean; batteryWarning: boolean; privacyDot: boolean; weatherCity: string; calendarUrl: string
+  musicGlow: 'adaptive' | 'rainbow' | 'white' | 'off'; speed: 'fast' | 'normal'; volumeBar: boolean; showBattery: boolean; showWifi: boolean; showBluetooth: boolean; showSpeaker: boolean; notchMode: 'auto' | 'custom'; notchLeft: string[]; notchRight: string[]; batteryWarning: boolean; privacyDot: boolean; weatherCity: string; calendarUrl: string
   startWithWindows: boolean; testMode: boolean
   stats: { cpu: boolean; ram: boolean; gpu: boolean }; statsRest: boolean; statsOpen: boolean; peekOnQuestion: boolean
   shortcuts: Record<ShortcutKey, string>

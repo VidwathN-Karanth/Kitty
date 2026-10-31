@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Wifi, WifiOff, Bluetooth, BluetoothOff, Settings as Gear, Volume as Volume0, Volume1, Volume2, VolumeX, Plane, Mic, Video, LayoutGrid, Ellipsis } from 'lucide-react'
 import { TABS, TabId } from './tabs'
@@ -13,6 +13,7 @@ import Bars from './Bars'
 import RunningLight from './RunningLight'
 import Battery from './Battery'
 import Stats from './Stats'
+import { arrange, NOTCH_ITEMS, type NotchItem } from './notch'
 import StatusDot from './StatusDot'
 import Confetti from './Confetti'
 import Volume from './Volume'
@@ -357,14 +358,35 @@ export default function App() {
   }
   const ticker = !open && !hud && settings.songTicker && m.playing && m.title
 
+  // Everything that can sit beside the cat in the closed island (null = not showing now), arranged by notch.ts:
+  // balanced automatically, or in the order the user set in Settings. Real widths are measured as they show.
+  const items: Record<NotchItem, ReactNode> = {
+    wifi: settings.showWifi && radios?.wifi ? <span className={'spk' + (radios.wifi === 'connected' ? '' : ' off')} title={`Wi-Fi ${radios.wifi}`}>{radios.wifi === 'off' ? <WifiOff size={15} /> : <Wifi size={15} />}</span> : null,
+    bt: settings.showBluetooth && radios?.bt ? <span className={'spk' + (radios.bt === 'on' ? '' : ' off')} title={`Bluetooth ${radios.bt}`}>{radios.bt === 'on' ? <Bluetooth size={15} /> : <BluetoothOff size={15} />}</span> : null,
+    speaker: settings.showSpeaker && media.vol ? <span className="spk">{speaker}</span> : null,
+    cpu: settings.statsRest && settings.stats.cpu && sys.cpu != null ? <Stats s={sys} on={{ cpu: true, ram: false, gpu: false }} compact /> : null,
+    ram: settings.statsRest && settings.stats.ram && sys.ram != null ? <Stats s={sys} on={{ cpu: false, ram: true, gpu: false }} compact /> : null,
+    gpu: settings.statsRest && settings.stats.gpu && sys.gpu != null ? <Stats s={sys} on={{ cpu: false, ram: false, gpu: true }} compact /> : null,
+    battery: settings.showBattery && laptop ? <Battery level={laptop.level} charging={laptop.charging} /> : null,
+    song: ticker ? <Ticker text={[m.title, m.artist].filter(Boolean).join(' · ')} color={bg[0] ?? tint} /> : null,
+    light: light ? <StatusDot color={light.color} kind={light.kind} /> : null,
+    bars: m.playing ? <Bars color={TAN} active colors={settings.musicGlow === 'adaptive' ? palette : RAINBOW} /> : null,
+  }
+  const widths = useRef<Partial<Record<NotchItem, number>>>({})
+  const [, remeasured] = useState(0)
+  const side = arrange(settings, (Object.keys(items) as NotchItem[]).filter((k) => items[k]), (k) => widths.current[k] ?? NOTCH_ITEMS[k].w)
+  useLayoutEffect(() => { // learn the real widths; arrange again when one changes
+    let changed = false
+    document.querySelectorAll<HTMLElement>('.bar [data-k]').forEach((el) => { const k = el.dataset.k as NotchItem; if (Math.abs((widths.current[k] ?? 0) - el.offsetWidth) > 2) { widths.current[k] = el.offsetWidth; changed = true } })
+    if (changed) remeasured((n) => n + 1)
+  })
+  const place = (l: NotchItem[]) => l.map((k) => <span key={k} data-k={k} className="ni">{items[k]}</span>)
+
   // left slot of the collapsed notch: what is being flashed, else small status icons that stay (plane, mic, camera)
   const leftIcons = !open && (
     hud === 'vol' ? volIcon
       : hud === 'air' ? <Plane size={17} color="#ffb04a" />
-      : <>
-          {settings.showWifi && radios?.wifi && <span className={'spk' + (radios.wifi === 'connected' ? '' : ' off')} title={`Wi-Fi ${radios.wifi}`}>{radios.wifi === 'off' ? <WifiOff size={15} /> : <Wifi size={15} />}</span>}
-          {settings.showBluetooth && radios?.bt && <span className={'spk' + (radios.bt === 'on' ? '' : ' off')} title={`Bluetooth ${radios.bt}`}>{radios.bt === 'on' ? <Bluetooth size={15} /> : <BluetoothOff size={15} />}</span>}
-          {settings.showSpeaker && media.vol && <span className="spk">{speaker}</span>}{settings.statsRest && <Stats s={sys} on={settings.stats} compact />}{air && <Plane size={16} color="#ffb04a" />}{priv?.mic && <span className="pdot mic"><Mic size={11} /></span>}{priv?.cam && <span className="pdot cam"><Video size={11} /></span>}</>
+      : <>{air && <Plane size={16} color="#ffb04a" />}{priv?.mic && <span className="pdot mic"><Mic size={11} /></span>}{priv?.cam && <span className="pdot cam"><Video size={11} /></span>}{place(side.left)}</>
   )
 
   return (
@@ -372,7 +394,7 @@ export default function App() {
       <Confetti />
       <motion.div
         ref={island}
-        className="island"
+        className={'island' + (open ? ' open' : '')}
         style={{ ['--isl' as string]: settings.islandTop }}
         initial={false}
         animate={open ? SIZE.open : hud === 'vol' ? SIZE.hudVol : hud === 'air' || hud === 'hi' ? { width: Math.max(SIZE.hudHi.width, hudW), height: SIZE.closed.height } : { width: restW, height: SIZE.closed.height }}
@@ -403,15 +425,15 @@ export default function App() {
               {hud === 'air' && !open ? <span className="hud"><b className="air-t">Airplane mode {air ? 'on' : 'off'}</b></span>
                 : hud === 'hi' && !open ? <span className="hud"><b className="air-t">Hi, I&apos;m {settings.name}!</b></span>
                 : hud === 'vol' && !open ? <span className="hud"><span className="hud-track"><i style={{ width: `${(media.vol?.mute ? 0 : media.vol?.v ?? 0) * 100}%` }} /></span><b>{Math.round((media.vol?.mute ? 0 : media.vol?.v ?? 0) * 100)}</b></span>
+                : !open ? place(side.right)
                 : <>
-                    {settings.showBattery && laptop && <Battery level={laptop.level} charging={laptop.charging} />}
-                    {ticker && <Ticker text={[m.title, m.artist].filter(Boolean).join(' · ')} color={bg[0] ?? tint} />}
+                    {items.battery}
                     <span className="grow" />
-                    {open && air && <Plane size={16} color="#ffb04a" aria-label="Airplane mode" />}
-                    {open && priv?.mic && <span className="pdot mic"><Mic size={11} /></span>}
-                    {open && priv?.cam && <span className="pdot cam"><Video size={11} /></span>}
-                    {light && <StatusDot color={light.color} kind={light.kind} />}
-                    {m.playing && <Bars color={TAN} active colors={settings.musicGlow === 'adaptive' ? palette : RAINBOW} />}
+                    {air && <Plane size={16} color="#ffb04a" aria-label="Airplane mode" />}
+                    {priv?.mic && <span className="pdot mic"><Mic size={11} /></span>}
+                    {priv?.cam && <span className="pdot cam"><Video size={11} /></span>}
+                    {items.light}
+                    {items.bars}
                   </>}
               {open && <button className="dots" onClick={() => setMenu((x) => !x)} aria-label="Menu"><Ellipsis size={18} />{update.state === 'ready' && <i className="upd-dot" />}</button>}
             </span>

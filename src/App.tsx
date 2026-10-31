@@ -324,8 +324,9 @@ export default function App() {
   useLayoutEffect(() => {
     if (open) return
     const used = (el: HTMLElement | null, gap: number) => {
-      const kids = [...(el?.children ?? [])].filter((k) => !k.classList.contains('grow') && (k as HTMLElement).offsetWidth > 0) as HTMLElement[]
-      return kids.reduce((w, k) => w + k.offsetWidth, 0) + Math.max(0, kids.length - 1) * gap
+      const all = [...(el?.children ?? [])] as HTMLElement[] // the spacer counts for the gaps around it too
+      const kids = all.filter((k) => !k.classList.contains('grow') && k.offsetWidth > 0)
+      return kids.reduce((w, k) => w + k.offsetWidth, 0) + Math.max(0, all.filter((k) => k.offsetWidth > 0 || k.classList.contains('grow')).length - 1) * gap
     }
     if (hud) {
       const parts = [...(barEl.current?.children ?? [])].map((k) => (k as HTMLElement).scrollWidth).filter((w) => w > 0) // full width, even while squeezed
@@ -386,21 +387,20 @@ export default function App() {
         >
           {media.state.playing && settings.musicGlow !== 'off' && <RunningLight mode={settings.musicGlow} palette={settings.musicGlow === 'rainbow' ? RAINBOW : palette} />}
           <div ref={barEl} className={'bar' + (hud && !open ? ' compact' : !open ? ' rest' : '')}>
-            <span className="title" ref={leftEl}>{leftIcons}{open && tab !== 'home' && <>{t1}<span style={{ color: cur.color }}>{t2}</span></>}</span>
+            {/* open or closed, the cat stays in the middle and the battery right next to it; the date and time sit on the cat's left */}
+            <span className="title" ref={leftEl}>{leftIcons}{open && tab !== 'home' && <>{t1}<span style={{ color: cur.color }}>{t2}</span></>}{open && <span className="grow" />}{open && settings.apps.clock && <span className="clock">{date} <b>{time}</b></span>}</span>
             <span className="mid">
               <span className="pet" onMouseMove={pet}>
                 {hearts.map((h) => <i key={h.id} className="heart" style={{ ['--hx' as string]: h.x + 'px' }}>♥</i>)}
               <Cat size={34} follow={settings.follow} light={light?.color} mood={mood} dance={dance} blink={settings.blinking} wave={hud === 'hi'} body={look.body} eyes={look.eyes} outfit={look.outfit} />
               </span>
-              {open && settings.showBattery && laptop && <Battery level={laptop.level} charging={laptop.charging} />}
-              {open && settings.apps.clock && <span className="clock">{date} <b>{time}</b></span>}
             </span>
             <span className="right" ref={rightEl}>
               {hud === 'air' && !open ? <span className="hud"><b className="air-t">Airplane mode {air ? 'on' : 'off'}</b></span>
                 : hud === 'hi' && !open ? <span className="hud"><b className="air-t">Hi, I&apos;m {settings.name}!</b></span>
                 : hud === 'vol' && !open ? <span className="hud"><span className="hud-track"><i style={{ width: `${(media.vol?.mute ? 0 : media.vol?.v ?? 0) * 100}%` }} /></span><b>{Math.round((media.vol?.mute ? 0 : media.vol?.v ?? 0) * 100)}</b></span>
                 : <>
-                    {!open && settings.showBattery && laptop && <Battery level={laptop.level} charging={laptop.charging} />}
+                    {settings.showBattery && laptop && <Battery level={laptop.level} charging={laptop.charging} />}
                     {ticker && <Ticker text={[m.title, m.artist].filter(Boolean).join(' · ')} color={bg[0] ?? tint} />}
                     <span className="grow" />
                     {open && air && <Plane size={16} color="#ffb04a" aria-label="Airplane mode" />}

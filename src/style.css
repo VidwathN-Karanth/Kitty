@@ -333,7 +333,11 @@ button:focus-visible, [role='button']:focus-visible { outline: 2px solid #ffffff
 .bar.rest .right { justify-self: stretch; padding-left: 8px; gap: 8px; }
 .bar.rest .title { justify-self: end; padding-right: 8px; gap: 6px; }
 .right .grow { flex: 1; }
-.bar:not(.rest) .right .grow { display: none; }
+.bar.compact .right .grow { display: none; }
+/* open island: same spacing as the resting notch, so the cat and the battery don't move when it opens */
+.bar:not(.rest):not(.compact) .right { justify-self: stretch; padding-left: 8px; gap: 8px; }
+.bar:not(.rest):not(.compact) .title { justify-self: stretch; padding-right: 8px; gap: 6px; }
+.title .grow { flex: 1; }
 .hc-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hc-badge { flex-shrink: 0; }
 
@@ -421,3 +425,9 @@ button:focus-visible, [role='button']:focus-visible { outline: 2px solid #ffffff
 
 /* speaker status in the resting notch, left of CPU */
 .spk { display: inline-grid; place-items: center; color: #9a9ca3; }
+
+/* the mute button inside the volume slider keeps its own size (not the menu's full-width button style) */
+.menu .vol button { display: grid; width: auto; padding: 0; flex: none; background: none; }
+
+/* both sides always get the same width, so the cat is exactly in the middle, open or closed */
+.bar:not(.compact) { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }

@@ -397,7 +397,7 @@ export default function App() {
   const leftIcons = !open && (
     hud === 'vol' ? volIcon
       : hud === 'air' ? <Plane size={17} color="#ffb04a" />
-      : <>{air && <Plane size={16} color="#ffb04a" />}{priv?.mic && <span className="pdot mic"><Mic size={11} /></span>}{priv?.cam && <span className="pdot cam"><Video size={11} /></span>}{place(side.left)}</>
+      : <>{air && <span className="ni"><Plane size={16} color="#ffb04a" /></span>}{priv?.mic && <span className="pdot mic"><Mic size={11} /></span>}{priv?.cam && <span className="pdot cam"><Video size={11} /></span>}{place(side.left)}</>
   )
 
   return (

@@ -341,7 +341,7 @@ export default function SettingsApp() {
               <Row title="Sleep effect" desc="Falls asleep when nothing happens for a while."><Toggle on={s.sleepEffect} onChange={(v) => set({ sleepEffect: v })} /></Row>
               <Row title="Fall asleep after" desc="When nothing happens (Sleep effect must be on)."><Seg value={s.sleepMins} onChange={(v) => set({ sleepMins: v })} options={[[5, '5 min'], [10, '10 min'], [30, '30 min']]} /></Row>
               <Row title="Startup animation" desc={'Wave and say "hi" at startup.'}><button className="btn" onClick={() => test('hi')}>Try it</button><Toggle on={s.startupAnim} onChange={(v) => set({ startupAnim: v })} /></Row>
-              <Row title="Hunger" desc={`${s.name} is ${st.hunger}% full. Every task gives food. When very hungry it looks sad.`}><Toggle on={s.hunger} onChange={(v) => set({ hunger: v })} /></Row>
+              <Row title="Hunger" desc={`${s.name} is ${st.hunger}% full. Every task gives food, or drag the fish onto the cat in the open island. When very hungry it asks for fish.`}><Toggle on={s.hunger} onChange={(v) => set({ hunger: v })} /></Row>
             </Group>
             <h3>Achievements · {earned}/12</h3>
             <div className="badges">

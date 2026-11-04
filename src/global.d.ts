@@ -73,6 +73,7 @@ interface Window {
     onToggle(cb: () => void): void
     onFold(cb: () => void): () => void
     bump(name: 'focus' | 'answers'): void
+    feed(): void
     stats(): Promise<SysStats>
     onStats(cb: (s: SysStats) => void): () => void
     isPaused(): Promise<boolean>

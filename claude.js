@@ -88,6 +88,8 @@ function simulate(kind) {
   else if (kind === 'error') { handle({ ...base, hook_event_name: 'UserPromptSubmit', prompt: 'Test run' }); handle({ ...base, hook_event_name: 'StopFailure' }) }
   else if (kind === 'clear') { sessions.delete('test'); onChange() }
 }
+// A fish dragged onto the cat: +25%, as often as you like (it just can't get fuller than 100%)
+function feed() { stats.fed = { level: Math.min(100, hungerNow() + 25), at: Date.now() }; saveStats(); onChange() }
 function bump(name) { stats.counters[name] = (stats.counters[name] || 0) + 1; saveStats(); onChange() }
 
 // ---------- sessions ----------
@@ -166,4 +168,4 @@ function start({ userDataDir, change, event }) {
   server.listen(PORT, '127.0.0.1')
 }
 
-module.exports = { start, snapshot, isInstalled, install, uninstall, bump, simulate, STEPS }
+module.exports = { start, snapshot, isInstalled, install, uninstall, bump, feed, simulate, STEPS }

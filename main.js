@@ -280,6 +280,7 @@ ipcMain.on('media:cmd', (_e, c) => {
   helper?.stdin.write(c + '\n')
   if (c === 'toggle' || c === 'next' || c === 'prev') claude.bump('dj') // counts toward the DJ badge
 })
+ipcMain.on('cat:feed', () => claude.feed())
 ipcMain.on('stat:bump', (_e, name) => { if (['focus', 'answers'].includes(name)) claude.bump(name) })
 
 // ---------- Test mode: try every state without real Claude work or music ----------

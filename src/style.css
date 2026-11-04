@@ -436,3 +436,9 @@ button:focus-visible, [role='button']:focus-visible { outline: 2px solid #ffffff
 
 /* one item beside the cat in the closed island (see notch.ts) */
 .ni { display: inline-flex; align-items: center; flex-shrink: 0; }
+
+/* the fish you drag onto the cat */
+.fish { display: inline-grid; place-items: center; width: 26px; height: 26px; margin-left: 6px; cursor: grab; touch-action: none; position: relative; z-index: 6; transition: transform 200ms var(--ease); }
+.fish.held { cursor: grabbing; transition: none; }
+.fish.hungry:not(.held) { animation: fish-wiggle 1.1s ease-in-out infinite; }
+@keyframes fish-wiggle { 0%, 100% { transform: rotate(-10deg); } 50% { transform: rotate(10deg); } }

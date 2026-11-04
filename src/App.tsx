@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Wifi, WifiOff, Bluetooth, BluetoothOff, Settings as Gear, Volume as Volume0, Volume1, Volume2, VolumeX, Plane, Mic, Video, LayoutGrid, Ellipsis } from 'lucide-react'
+import { Fish, Wifi, WifiOff, Bluetooth, BluetoothOff, Settings as Gear, Volume as Volume0, Volume1, Volume2, VolumeX, Plane, Mic, Video, LayoutGrid, Ellipsis } from 'lucide-react'
 import { TABS, TabId } from './tabs'
 import Home from './Home'
 import Cat, { Mood } from './Cat'
@@ -43,6 +43,25 @@ function Ticker({ text, color }: { text: string; color: string }) {
   return (
     <span className="ticker" style={{ background: bg }} title={shown}>
       <span key={shown} ref={run} className="ticker-run" style={{ animationDuration: `${secs}s` }}>{shown}<i />{shown}<i /></span>
+    </span>
+  )
+}
+
+// A fish beside the cat in the open island: drag it onto the cat to feed it. Let go anywhere else and it slides back.
+function FishTreat({ hungry, full, onFeed }: { hungry: boolean; full: number; onFeed: () => void }) {
+  const [at, setAt] = useState<{ x: number; y: number } | null>(null)
+  const start = useRef({ x: 0, y: 0 })
+  const up = (e: React.PointerEvent) => {
+    setAt(null)
+    const c = document.querySelector('.pet')?.getBoundingClientRect()
+    if (c && e.clientX > c.left - 10 && e.clientX < c.right + 10 && e.clientY > c.top - 10 && e.clientY < c.bottom + 10) onFeed()
+  }
+  return (
+    <span className={'fish' + (hungry ? ' hungry' : '') + (at ? ' held' : '')} title={`Drag me onto the cat (${full}% full)`} style={at ? { transform: `translate(${at.x}px, ${at.y}px)` } : undefined}
+      onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); start.current = { x: e.clientX, y: e.clientY }; setAt({ x: 0, y: 0 }) }}
+      onPointerMove={(e) => { if (at) setAt({ x: e.clientX - start.current.x, y: e.clientY - start.current.y }) }}
+      onPointerUp={up} onPointerCancel={() => setAt(null)}>
+      <Fish size={20} fill="#6ec6ff" color="#2b7fb8" />
     </span>
   )
 }
@@ -350,11 +369,20 @@ export default function App() {
     r.t = now; r.x = e.clientX; r.y = e.clientY
     if (r.d > 70 && now - r.last > 260) {
       r.d = 0; r.last = now
-      const id = now
-      setHearts((h) => [...h.slice(-5), { id, x: Math.random() * 30 - 15 }])
-      window.setTimeout(() => setHearts((h) => h.filter((x) => x.id !== id)), 1100)
+      heart()
       showMood('purr', 1800)
     }
+  }
+  const heart = () => {
+    const id = performance.now() + Math.random()
+    setHearts((h) => [...h.slice(-5), { id, x: Math.random() * 30 - 15 }])
+    window.setTimeout(() => setHearts((h) => h.filter((x) => x.id !== id)), 1100)
+  }
+  // fed a fish: it purrs, with a little burst of hearts
+  const feed = () => {
+    window.kitty.feed()
+    showMood('purr', 2600)
+    for (let i = 0; i < 4; i++) window.setTimeout(heart, i * 180)
   }
   const ticker = !open && !hud && settings.songTicker && m.playing && m.title
 
@@ -425,7 +453,7 @@ export default function App() {
           {media.state.playing && settings.musicGlow !== 'off' && <RunningLight mode={settings.musicGlow} palette={settings.musicGlow === 'rainbow' ? RAINBOW : palette} />}
           <div ref={barEl} className={'bar' + (hud && !open ? ' compact' : !open ? ' rest' : '')}>
             {/* open or closed, the cat stays in the middle and the battery right next to it; the date and time sit on the cat's left */}
-            <span className="title" ref={leftEl}>{leftIcons}{open && tab !== 'home' && <>{t1}<span style={{ color: cur.color }}>{t2}</span></>}{open && <span className="grow" />}{open && settings.apps.clock && <span className="clock">{date} <b>{time}</b></span>}</span>
+            <span className="title" ref={leftEl}>{leftIcons}{open && tab !== 'home' && <>{t1}<span style={{ color: cur.color }}>{t2}</span></>}{open && <span className="grow" />}{open && settings.apps.clock && <span className="clock">{date} <b>{time}</b></span>}{open && settings.hunger && claude.stats.hunger < 100 && <FishTreat hungry={claude.stats.hunger < 10} full={claude.stats.hunger} onFeed={feed} />}</span>
             <span className="mid">
               <span className="pet" onMouseMove={pet}>
                 {hearts.map((h) => <i key={h.id} className="heart" style={{ ['--hx' as string]: h.x + 'px' }}>♥</i>)}

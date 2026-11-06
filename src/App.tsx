@@ -191,7 +191,7 @@ export default function App() {
     trickTimer.current = window.setTimeout(() => setTrick(null), 1400)
   }, [tab, open])
 
-  // New outfit earned: celebrate
+  // Task milestone reached: celebrate
   const prevTotal = useRef<number | null>(null)
   useEffect(() => {
     if (!loaded) return
@@ -199,7 +199,7 @@ export default function App() {
     if (prevTotal.current !== null && OUTFIT_STEPS.some((n) => prevTotal.current! < n && t >= n)) {
       confetti(); showMood('celebrate', 4000)
       if (cfg.current.sounds) sounds.fanfare()
-      if (cfg.current.notifications) new Notification('New outfit!', { body: `${cfg.current.name} earned something new to wear` })
+      if (cfg.current.notifications) new Notification('Milestone!', { body: `${t} tasks finished. ${cfg.current.name} is proud of you.` })
     }
     prevTotal.current = t
   }, [claude.stats.total, loaded])

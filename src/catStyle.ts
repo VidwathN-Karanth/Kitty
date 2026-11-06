@@ -16,7 +16,8 @@ export const eyeColor = (id: string) => (EYE.find((b) => b.id === id) ?? EYE[0])
 
 export type Outfit = string
 
-// Outfits earned by finishing Claude tasks. "best" wears the highest one earned (or a seasonal one).
+// Every outfit is open to everyone from the start (not everybody uses Claude Code, so tasks can't be the only way in).
+// "need" only drives "best": the automatic choice, which gets fancier as tasks finish (or wears a seasonal one).
 export const OUTFITS = [
   { id: 'best', name: 'Best', need: 0, emoji: '\u2728' },
   { id: 'none', name: 'None', need: 0, emoji: '\u{1F6AB}' },
@@ -57,8 +58,7 @@ export function wearing(s: { outfit: string; seasonal: boolean }, total: number,
     const sea = s.seasonal ? seasonal(d) : null
     return sea ?? [...OUTFITS].reverse().find((o) => o.need > 0 && total >= o.need)?.id ?? 'none'
   }
-  const need = OUTFITS.find((o) => o.id === s.outfit)?.need ?? 0
-  return total >= need ? s.outfit : 'none'
+  return s.outfit
 }
 
 export type CatLook = { body: string; eyes: string; outfit: Outfit }

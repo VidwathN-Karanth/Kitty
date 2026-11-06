@@ -161,14 +161,14 @@ export default function SettingsApp() {
     { id: 'dj', icon: '\u{1F3A7}', title: 'DJ', desc: 'Controlled music 10 times from the island', ok: st.counters.dj >= 10 },
     { id: 'collector', icon: '\u{1F4C1}', title: 'Collector', desc: '5 files in the tray', ok: trayCount >= 5 },
     { id: 'roll', icon: '\u{1F525}', title: 'On a roll', desc: '3 days in a row', ok: st.streak >= 3 },
-    { id: 'fashion', icon: '\u{1F451}', title: 'Fashion icon', desc: 'All outfits earned', ok: st.total >= 30 },
+    { id: 'fashion', icon: '\u{1F451}', title: 'Fashion icon', desc: '30 tasks finished', ok: st.total >= 30 },
   ]
   const earned = badges.filter((b) => b.ok).length
 
   // search across all settings
   const index = useMemo(() => [
     ['general', 'Test mode', 'try everything without real Claude or music'], ['general', 'Speed', 'animation speed'], ['general', 'App animations', 'trick when you open an app'],
-    ['general', 'Confetti', 'long tasks finished focus new outfits'], ['general', 'Traffic-light sounds', 'ding pling error sound'], ['general', 'Sound level', 'volume of the sounds'],
+    ['general', 'Confetti', 'long tasks finished focus milestones'], ['general', 'Traffic-light sounds', 'ding pling error sound'], ['general', 'Sound level', 'volume of the sounds'],
     ['general', 'Windows notifications', 'notifications'], ['general', 'Warn at limit', '5-hour usage limit budget'], ['general', 'Keyboard shortcuts', 'hotkeys keys'],
     ['general', 'Weather', 'city'], ['general', 'Calendar', 'ical google meetings'], ['general', 'Volume bar', 'volume'], ['general', 'Running light', 'music glow border rainbow white adaptive'], ['general', 'CPU, RAM and GPU', 'stats usage memory'], ['general', 'Battery warning', 'laptop bluetooth'],
     ['general', 'Mic and camera dots', 'privacy'], ['general', 'Start with Windows', 'autostart login'], ['general', 'Reset everything', 'defaults'], ['general', 'Updates', 'version update'],
@@ -362,18 +362,15 @@ export default function SettingsApp() {
               <b>{s.name}</b><small>Wearing: {outfit === 'none' ? 'nothing' : outfit}</small>
             </div>
             <div>
-              <h3 style={{ marginTop: 0 }}>Outfit <small className="dim">Earn more by finishing tasks</small></h3>
+              <h3 style={{ marginTop: 0 }}>Outfit <small className="dim">Pick anything. Kitty tries it on right away.</small></h3>
               <div className="outfits">
-                {OUTFITS.map((o) => {
-                  const locked = st.total < o.need
-                  return (
-                    <button key={o.id} disabled={locked} className={s.outfit === o.id ? 'on' : ''} onClick={() => set({ outfit: o.id })}>
-                      {s.outfit === o.id && <Check size={14} className="chk" />}
-                      <span className="em">{o.emoji}</span><b>{o.name}</b>
-                      {o.need > 0 && <small>{locked ? `Earned at ${o.need} tasks` : 'Unlocked'}</small>}
-                    </button>
-                  )
-                })}
+                {OUTFITS.map((o) => (
+                  <button key={o.id} className={s.outfit === o.id ? 'on' : ''} onClick={() => set({ outfit: o.id })}>
+                    {s.outfit === o.id && <Check size={14} className="chk" />}
+                    <span className="em">{o.emoji}</span><b>{o.name}</b>
+                    {o.id === 'best' && <small>Changes as tasks finish</small>}
+                  </button>
+                ))}
               </div>
               <h3>Fur</h3>
               <div className="swatches">{BODY.map((b) => <button key={b.id} className={s.bodyColor === b.id ? 'on' : ''} onClick={() => set({ bodyColor: b.id })}><i style={{ background: b.c }} />{b.name}</button>)}</div>
@@ -401,7 +398,7 @@ export default function SettingsApp() {
             <Group title="Animations">
               <Row title="Speed" desc="How fast the island opens, closes and reacts."><Seg value={s.speed} onChange={(v) => set({ speed: v })} options={[['fast', 'Fast'], ['normal', 'Normal']]} /></Row>
               <Row title="App animations" desc="Kitty does a little trick when you open an app."><Toggle on={s.appAnim} onChange={(v) => set({ appAnim: v })} /></Row>
-              <Row title="Confetti" desc="For long tasks, finished focus and new outfits."><button className="btn" onClick={() => test('confetti')}>Try it</button><Toggle on={s.confetti} onChange={(v) => set({ confetti: v })} /></Row>
+              <Row title="Confetti" desc="For long tasks, finished focus and task milestones."><button className="btn" onClick={() => test('confetti')}>Try it</button><Toggle on={s.confetti} onChange={(v) => set({ confetti: v })} /></Row>
             </Group>
             <Group title="Focus & notifications">
               <Row title="Traffic-light sounds" desc="Ding when done, pling for a question, low for an error."><button className="btn" onClick={() => sounds.done()}>Play</button><Toggle on={s.sounds} onChange={(v) => set({ sounds: v })} /></Row>

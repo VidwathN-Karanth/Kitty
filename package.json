@@ -1,14 +1,15 @@
 {
   "name": "kitty",
   "productName": "Kitty",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "main": "main.js",
   "scripts": {
     "dev": "concurrently -k \"vite\" \"wait-on tcp:5173 && electron .\"",
     "build": "vite build",
     "dist": "vite build && electron-builder --win nsis --publish never",
-    "release": "vite build && electron-builder --win nsis --publish always"
+    "release": "vite build && electron-builder --win nsis --publish always",
+    "dist:linux": "electron-builder --linux AppImage --publish never"
   },
   "dependencies": {
     "@fontsource/cascadia-mono": "^5.3.0",
@@ -46,6 +47,7 @@
       "dist/**/*",
       "info.js",
       "main.js",
+      "media-linux.js",
       "media.ps1",
       "package.json",
       "preload.js",
@@ -90,6 +92,21 @@
         "owner": "VidwathN-Karanth",
         "repo": "Kitty"
       }
-    ]
+    ],
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "Utility",
+      "artifactName": "${productName}-${version}.${ext}",
+      "synopsis": "A dynamic island with a cat",
+      "description": "Kitty: a dynamic island for your desktop, with a cat that keeps you company."
+    }
   }
 }

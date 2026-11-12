@@ -9,6 +9,12 @@ const settings = require('./settings')
 const info = require('./info')
 const usage = require('./usage')
 
+const LINUX = process.platform === 'linux'
+// Linux: run on X11 (through XWayland on Wayland desktops). Native Wayland doesn't let an app stay on top, sit at the
+// top edge of the screen or know where the cursor is, which the island needs. Starting Kitty with
+// --ozone-platform=wayland (for a desktop without XWayland) is respected.
+if (LINUX && !app.commandLine.hasSwitch('ozone-platform')) app.commandLine.appendSwitch('ozone-platform', 'x11')
+
 // dev only: lets automated checks drive the windows over the DevTools protocol
 if (!app.isPackaged) app.commandLine.appendSwitch('remote-debugging-port', '9333')
 
@@ -86,7 +92,7 @@ function buildTrayMenu() {
     { type: 'separator' },
     { label: 'Open the island', enabled: !paused, click: () => win?.webContents.send('toggle') },
     { label: 'Settings', click: () => openSettings() },
-    { label: 'Start with Windows', type: 'checkbox', checked: s.startWithWindows, enabled: app.isPackaged, click: (i) => applySettings(settings.patch({ startWithWindows: i.checked })) },
+    { label: LINUX ? 'Start at login' : 'Start with Windows', type: 'checkbox', checked: s.startWithWindows, enabled: app.isPackaged, click: (i) => applySettings(settings.patch({ startWithWindows: i.checked })) },
     { label: 'Check for updates', click: () => updater.check() },
     { type: 'separator' },
     { label: 'Quit', click: () => app.quit() },
@@ -130,7 +136,7 @@ function applySettings(s) {
   refreshTray()
   syncGpuHelper(s)
   info.settingsChanged(s)
-  if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: s.startWithWindows, name: 'Kitty' })
+  autostart(s.startWithWindows)
   all('settings', s)
   return s
 }
@@ -234,7 +240,9 @@ let fake = null // Test mode can fake a song for a while
 const view = () => (fake && Date.now() < fake.until ? { ...media, state: fake.state } : media) // the test song borrows the last real cover
 const pushMedia = () => win?.webContents.send('media', view())
 function startMedia() {
-  helper = spawn('powershell.exe', ['-NoProfile', '-NoLogo', '-ExecutionPolicy', 'Bypass', '-File', unpacked('media.ps1')], { windowsHide: true })
+  helper = LINUX
+    ? spawn(process.execPath, [path.join(__dirname, 'media-linux.js')], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' } }) // same messages, from Linux tools
+    : spawn('powershell.exe', ['-NoProfile', '-NoLogo', '-ExecutionPolicy', 'Bypass', '-File', unpacked('media.ps1')], { windowsHide: true })
   let buf = ''
   helper.stdout.setEncoding('utf8')
   if (gpuWanted) helper.stdin.write('gpu on\n') // a restarted helper picks up where the old one was
@@ -296,12 +304,18 @@ ipcMain.on('test:run', (_e, kind) => {
 // ---------- system stats: CPU and RAM from Node, GPU from a PowerShell helper (only while it is shown) ----------
 let sysStats = { cpu: null, ram: null, ramUsed: 0, ramTotal: 0, gpu: null }, lastCpu = null
 const cpuTimes = () => os.cpus().reduce((a, c) => { const t = c.times; a.idle += t.idle; a.total += t.user + t.nice + t.sys + t.idle + t.irq; return a }, { idle: 0, total: 0 })
+// Windows: os.freemem() is the available memory, same as Task Manager. Linux: it leaves out the file cache the system
+// gives back whenever needed, so MemAvailable from /proc/meminfo is the honest number.
+function availableMemory() {
+  if (LINUX) try { return +/MemAvailable:\s+(\d+)/.exec(fs.readFileSync('/proc/meminfo', 'utf8'))[1] * 1024 } catch {}
+  return os.freemem()
+}
 function sampleStats() {
   if (paused) return
   const t = cpuTimes()
   if (lastCpu && t.total > lastCpu.total) sysStats.cpu = Math.max(0, Math.min(100, Math.round(100 * (1 - (t.idle - lastCpu.idle) / (t.total - lastCpu.total)))))
   lastCpu = t
-  const total = os.totalmem(), free = os.freemem() // free = available memory on Windows, same as Task Manager
+  const total = os.totalmem(), free = availableMemory()
   sysStats.ram = Math.round(100 * (1 - free / total))
   sysStats.ramUsed = +((total - free) / 2 ** 30).toFixed(1)
   sysStats.ramTotal = Math.round(total / 2 ** 30)
@@ -351,7 +365,7 @@ let cli = null
 // counts (that is also how the Codex desktop app shows up).
 function hasCli(name) {
   const env = process.env, home = os.homedir()
-  const dirs = [...(env.PATH || '').split(';'), path.join(env.APPDATA || '', 'npm'), path.join(env.LOCALAPPDATA || '', 'Microsoft', 'WinGet', 'Links'),
+  const dirs = [...(env.PATH || '').split(path.delimiter), path.join(home, '.npm-global', 'bin'), '/usr/local/bin', path.join(home, '.volta', 'bin'), path.join(env.APPDATA || '', 'npm'), path.join(env.LOCALAPPDATA || '', 'Microsoft', 'WinGet', 'Links'),
     path.join(home, '.local', 'bin'), path.join(home, 'scoop', 'shims'), path.join(env.LOCALAPPDATA || '', 'Volta', 'bin'), path.join(env.ProgramFiles || '', 'nodejs'),
     path.join(env.LOCALAPPDATA || '', 'Programs', name), path.join(home, '.bun', 'bin'), path.join(env.LOCALAPPDATA || '', 'pnpm')]
   if (dirs.some((d) => d && ['.exe', '.cmd', '.bat', '.ps1', ''].some((x) => fs.existsSync(path.join(d, name + x))))) return Promise.resolve(true)
@@ -370,12 +384,25 @@ ipcMain.handle('claude:set', (_e, on) => {
 let usedTokens = 0
 ipcMain.handle('usage:get', () => usedTokens)
 
+// Start at login. Windows: its Startup apps list. Linux: a .desktop file in ~/.config/autostart (pointing at the
+// AppImage, whose path stays the same across updates).
+function autostart(on) {
+  if (!app.isPackaged) return
+  if (!LINUX) return app.setLoginItemSettings({ openAtLogin: on, name: 'Kitty' })
+  const file = path.join(os.homedir(), '.config', 'autostart', 'kitty.desktop')
+  try {
+    if (!on) return fs.rmSync(file, { force: true })
+    fs.mkdirSync(path.dirname(file), { recursive: true })
+    fs.writeFileSync(file, `[Desktop Entry]\nType=Application\nName=Kitty\nComment=A dynamic island with a cat\nExec="${process.env.APPIMAGE || process.execPath}"\nX-GNOME-Autostart-enabled=true\n`)
+  } catch (e) { console.log('[autostart]', e.message) }
+}
+
 if (!app.requestSingleInstanceLock()) app.quit() // one Kitty at a time (also keeps the hook port free)
 
 app.whenReady().then(() => {
   settings.load(app.getPath('userData'))
-  // register (or unregister) with Windows on every launch, so the Startup apps entry always points at this copy
-  if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: settings.get().startWithWindows, name: 'Kitty' })
+  // register (or unregister) on every launch, so the startup entry always points at this copy
+  autostart(settings.get().startWithWindows)
   info.start(settings.get(), (i) => all('info', i))
   create()
   makeTray()

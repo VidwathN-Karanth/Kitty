@@ -20,6 +20,8 @@ import { sounds, setSoundLevel } from './sound'
 import './settings.css'
 import NotchEditor from './NotchEditor'
 
+const LOGIN = navigator.userAgent.includes('Windows') ? 'Start with Windows' : 'Start at login'
+
 const PAGES = [
   { id: 'home', label: 'Home', icon: Home, group: 0 },
   { id: 'connections', label: 'Connections', icon: Plug, group: 0 },
@@ -171,7 +173,7 @@ export default function SettingsApp() {
     ['general', 'Confetti', 'long tasks finished focus milestones'], ['general', 'Traffic-light sounds', 'ding pling error sound'], ['general', 'Sound level', 'volume of the sounds'],
     ['general', 'Windows notifications', 'notifications'], ['general', 'Warn at limit', '5-hour usage limit budget'], ['general', 'Keyboard shortcuts', 'hotkeys keys'],
     ['general', 'Weather', 'city'], ['general', 'Calendar', 'ical google meetings'], ['general', 'Volume bar', 'volume'], ['general', 'Running light', 'music glow border rainbow white adaptive'], ['general', 'CPU, RAM and GPU', 'stats usage memory'], ['general', 'Battery warning', 'laptop bluetooth'],
-    ['general', 'Mic and camera dots', 'privacy'], ['general', 'Start with Windows', 'autostart login'], ['general', 'Reset everything', 'defaults'], ['general', 'Updates', 'version update'],
+    ['general', 'Mic and camera dots', 'privacy'], ['general', LOGIN, 'autostart login startup windows'], ['general', 'Reset everything', 'defaults'], ['general', 'Updates', 'version update'],
     ['kitty', 'Name', 'cat name your name'], ['kitty', 'Traffic-light eyes', 'colours classic soft colour-blind'], ['kitty', 'Faces', 'emotions expressions'], ['kitty', 'Blinking', ''],
     ['kitty', 'Dancing to music', 'headphones'], ['kitty', 'Sleep effect', 'falls asleep idle'], ['kitty', 'Startup animation', 'wave hi'], ['kitty', 'Hunger', 'food'],
     ['kitty', 'Badges', 'achievements'], ['wardrobe', 'Outfit', 'hat sunglasses crown'], ['wardrobe', 'Fur and eye colour', 'body'], ['wardrobe', 'Seasonal outfits', 'santa witch king'],
@@ -452,7 +454,7 @@ export default function SettingsApp() {
               <Row title="Reset everything" desc="Set all these choices back to default (keeps your names, city and calendar)."><button className="btn" onClick={() => window.kitty.resetSettings()}>Reset</button></Row>
             </Group>
             <Group title="Kitty">
-              <Row title="Start with Windows" desc={dev ? 'Works in the installed app (not while running from source).' : 'Kitty starts by itself when you turn on your PC.'}><Toggle on={s.startWithWindows} onChange={(v) => set({ startWithWindows: v })} disabled={dev} /></Row>
+              <Row title={LOGIN} desc={dev ? 'Works in the installed app (not while running from source).' : 'Kitty starts by itself when you turn on your PC.'}><Toggle on={s.startWithWindows} onChange={(v) => set({ startWithWindows: v })} disabled={dev} /></Row>
               <Row title="Updates" desc={update.state === 'error' ? update.error : `Version ${update.current || '—'}`}>
                 <button className={'btn' + (update.state === 'ready' ? ' lime' : '')} disabled={['dev', 'checking', 'downloading'].includes(update.state)}
                   onClick={() => (update.state === 'ready' ? window.kitty.installUpdate() : window.kitty.checkUpdate())}>{updateLabel(update)}</button>

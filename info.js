@@ -66,6 +66,7 @@ async function refreshCalendar(url) {
 
 // ---------- Bluetooth batteries (headphones, mouse...) ----------
 function refreshBluetooth() {
+  if (process.platform === 'linux') return bluetoothLinux()
   return new Promise((resolve) => {
     let out = ''
     const p = spawn('powershell.exe', ['-NoProfile', '-NoLogo', '-ExecutionPolicy', 'Bypass', '-File', path.join(__dirname, 'bt.ps1').replace('app.asar', 'app.asar.unpacked')], { windowsHide: true })
@@ -73,6 +74,22 @@ function refreshBluetooth() {
     p.on('error', () => resolve())
     p.on('close', () => { try { info.bt = JSON.parse(out.trim() || '[]') } catch { info.bt = [] } resolve() })
   })
+}
+
+// Linux: upower knows the battery of connected Bluetooth devices (not the laptop's own battery, nor the power supply)
+function bluetoothLinux() {
+  const { execFile } = require('child_process')
+  const ask = (args) => new Promise((ok) => execFile('upower', args, { timeout: 4000 }, (e, out) => ok(e ? '' : String(out))))
+  return ask(['-e']).then(async (list) => {
+    const devs = list.split('\n').filter((d) => d && !/DisplayDevice|battery_BAT|line_power|ups_/i.test(d))
+    const out = []
+    for (const d of devs) {
+      const t = await ask(['-i', d])
+      const pct = /percentage:\s+([\d.]+)%/.exec(t), name = /model:\s+(.+)/.exec(t)
+      if (pct && name) out.push({ name: name[1].trim(), level: Math.round(+pct[1]) })
+    }
+    info.bt = out
+  }).catch(() => { info.bt = [] })
 }
 
 // ---------- scheduling ----------

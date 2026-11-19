@@ -43,12 +43,13 @@ const DEFAULTS = {
   // system stats: which ones, and where (the resting notch and/or the open island)
   stats: { cpu: true, ram: true, gpu: true }, statsRest: true, statsOpen: true,
   peekOnQuestion: true,   // open the island when Claude asks something (finishing only plays the sound + dot)
+  startTab: 'last',       // the page the island opens on ('last' = wherever it was left)
 
   shortcuts: {
     open: 'Ctrl+Alt+T', home: 'Ctrl+Alt+Shift+1', music: 'Ctrl+Alt+Shift+2', claude: 'Ctrl+Alt+Shift+3',
     focus: 'Ctrl+Alt+Shift+4', clipboard: 'Ctrl+Alt+Shift+5', note: 'Ctrl+Alt+Shift+6',
   },
-  apps: { claude: true, music: true, chat: true, focus: true, tray: true, clipboard: true, note: true, clock: true },
+  apps: { claude: true, music: true, chat: true, focus: true, tray: true, clipboard: true, note: true, clock: true, system: true, links: true },
 }
 
 let file = null

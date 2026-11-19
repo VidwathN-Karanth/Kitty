@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, globalShortcut, screen, clipboard, shell, powerMonitor, Tray, Menu, nativeImage } = require('electron')
+const { app, BrowserWindow, ipcMain, globalShortcut, screen, clipboard, shell, powerMonitor, Tray, Menu, nativeImage, net } = require('electron')
 const path = require('path')
 const fs = require('fs')
 const { spawn, execFile } = require('child_process')
@@ -8,6 +8,7 @@ const updater = require('./updater')
 const settings = require('./settings')
 const info = require('./info')
 const usage = require('./usage')
+const wifi = require('./wifi')
 
 const LINUX = process.platform === 'linux'
 // Linux: run on X11 (through XWayland on Wayland desktops). Native Wayland doesn't let an app stay on top, sit at the
@@ -149,7 +150,51 @@ ipcMain.on('settings:reset', () => { const s = applySettings(settings.reset()); 
 ipcMain.on('shortcuts:reset', () => { const s = applySettings(settings.resetShortcuts()); registerShortcuts(s.shortcuts) })
 ipcMain.on('app:restart', () => { app.relaunch(); app.exit(0) })
 ipcMain.handle('info:get', () => info.get())
-ipcMain.on('open:url', (_e, u) => { if (/^https:\/\//i.test(u)) shell.openExternal(u) }) // only https links, e.g. meeting links
+// web links (meeting links, saved sites) and Windows Settings pages, nothing else (no files, no other schemes)
+ipcMain.on('open:url', (_e, u) => { if (typeof u === 'string' && (/^https?:\/\/[^\s]+$/i.test(u) || /^ms-settings:[a-z-]+$/.test(u))) shell.openExternal(u) })
+
+// ---------- Links: a saved site's logo and name ----------
+// The page's own icons (apple-touch-icon / icon links, biggest first), else /favicon.ico, returned as a data: URL so
+// it is saved with the link and shows offline; plus the page title for a name. Only the site itself is asked.
+const fetchQuick = (u) => net.fetch(u, { signal: AbortSignal.timeout(6000) })
+const entities = (s) => s.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#0?39;|&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+async function siteIcon(base, found) {
+  found.sort((a, b) => b.size - a.size)
+  for (const href of [...found.slice(0, 4).map((f) => f.href), new URL('/favicon.ico', base).href]) {
+    try {
+      if (href.startsWith('data:image/')) return href
+      const r = await fetchQuick(href)
+      const type = (r.headers.get('content-type') || '').split(';')[0].trim()
+      if (!r.ok || !/^image\/|octet-stream/.test(type)) continue
+      const buf = Buffer.from(await r.arrayBuffer())
+      if (buf.length && buf.length < 400000) return `data:${type.startsWith('image/') ? type : 'image/x-icon'};base64,${buf.toString('base64')}`
+    } catch {}
+  }
+  return null
+}
+ipcMain.handle('site:info', async (_e, u) => {
+  let base
+  try { base = new URL(u); if (!/^https?:$/.test(base.protocol)) return { icon: null, title: '' } } catch { return { icon: null, title: '' } }
+  const found = []
+  let title = ''
+  try {
+    const res = await fetchQuick(base.href)
+    const html = (await res.text()).slice(0, 300000)
+    title = entities(/<title[^>]*>([^<]{1,200})<\/title>/i.exec(html)?.[1] || '').trim().split(/\s[-|–—:·]\s/)[0].trim()
+    for (const [tag] of html.matchAll(/<link\b[^>]*>/gi)) {
+      const rel = (/\brel\s*=\s*["']?([^"'>]+)/i.exec(tag)?.[1] || '').toLowerCase()
+      const href = /\bhref\s*=\s*["']?([^"'\s>]+)/i.exec(tag)?.[1]
+      if (!href || !/icon/.test(rel) || /mask/.test(rel)) continue
+      const size = +(/\bsizes\s*=\s*["']?(\d+)/i.exec(tag)?.[1] || (rel.includes('apple') ? 180 : 32))
+      try { found.push({ href: new URL(entities(href), res.url || base.href).href, size }) } catch {}
+    }
+  } catch {}
+  return { icon: await siteIcon(base, found), title }
+})
+
+// ---------- Control Center: Wi-Fi networks (the radios, brightness and power mode go through the media helper) ----------
+ipcMain.handle('wifi:list', (_e, scan) => { if (scan) helper?.stdin.write('wifiscan\n'); return wifi.list() }) // the scan's results show on the next list
+ipcMain.handle('wifi:join', (_e, { ssid, password, secure }) => wifi.join(ssid, password, secure))
 
 // Global shortcuts (rebindable in Settings). Tells the Settings window which ones could not be registered.
 function registerShortcuts(sc) {
@@ -257,6 +302,8 @@ function startMedia() {
         else if (m.type === 'radios') media.radios = { wifi: m.wifi, bt: m.bt }
         else if (m.type === 'priv') media.priv = { mic: m.mic, cam: m.cam }
         else if (m.type === 'vol') media.vol = { v: m.v, mute: m.mute }
+        else if (m.type === 'bright') media.bright = m.v
+        else if (m.type === 'power') media.power = m.mode
         else if (m.type === 'art') media.art = { mime: m.mime, data: m.data }
         else if (m.type === 'gpu') { sysStats.gpu = m.gpu; continue }
         else if (m.type === 'windrag' || m.type === 'snip') { stepAside(m.type, m.on); continue }

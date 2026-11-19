@@ -1,5 +1,6 @@
 # Long-running helper: reports the current Windows media session (Spotify, browser, ...) as JSON lines on stdout
-# and accepts commands on stdin: toggle | next | prev.
+# and accepts commands on stdin: toggle | next | prev | vol <0-1> | mute | gpu on|off | bright <0-100> |
+# radio WiFi|Bluetooth on|off | power eff|bal|perf.
 [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
 Add-Type -AssemblyName System.Runtime.WindowsRuntime
 $null = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType = WindowsRuntime]
@@ -107,6 +108,64 @@ function RadioStates {
   return "$w|$b"
 }
 
+# Turn the Wi-Fi or Bluetooth radio on/off (the Control Center tiles): "radio WiFi on", "radio Bluetooth off"
+function SetRadio($kind, $on) {
+  try {
+    $null = Await ([Windows.Devices.Radios.Radio]::RequestAccessAsync()) ([Windows.Devices.Radios.RadioAccessStatus])
+    $st = if ($on) { [Windows.Devices.Radios.RadioState]::On } else { [Windows.Devices.Radios.RadioState]::Off }
+    $r = Await ([Windows.Devices.Radios.Radio]::GetRadiosAsync()) $radioList
+    foreach ($x in $r) { if ("$($x.Kind)" -eq $kind) { $null = Await ($x.SetStateAsync($st)) ([Windows.Devices.Radios.RadioAccessStatus]) } }
+  } catch {}
+}
+
+# Screen brightness (0-100) of the built-in display. Desktop monitors don't answer: then it is reported once as null
+# and never asked again.
+$noBright = $false; $lastB = -2
+function Brightness {
+  if ($script:noBright) { return $null }
+  try { return [int](Get-CimInstance -Namespace root/wmi -ClassName WmiMonitorBrightness -ErrorAction Stop | Select-Object -First 1).CurrentBrightness }
+  catch { $script:noBright = $true; return $null }
+}
+function SetBrightness($n) {
+  try { Get-CimInstance -Namespace root/wmi -ClassName WmiMonitorBrightnessMethods -ErrorAction Stop | Invoke-CimMethod -MethodName WmiSetBrightness -Arguments @{ Timeout = 1; Brightness = [byte][math]::Max(0, [math]::Min(100, [int]$n)) } | Out-Null } catch {}
+}
+
+# Windows 11 power mode (Settings > Power): efficiency | balanced | performance. null when the PC has no power modes
+# (a custom power plan is active).
+try {
+  Add-Type -TypeDefinition @'
+using System; using System.Runtime.InteropServices;
+public static class PowerMode {
+  [DllImport("powrprof.dll")] static extern uint PowerGetEffectiveOverlayScheme(out Guid g);
+  [DllImport("powrprof.dll")] static extern uint PowerSetActiveOverlayScheme(Guid g);
+  static readonly Guid Eff = new Guid("961cc777-2547-4f9d-8174-7d86181b8a7a"), Bat = new Guid("3af9b8d9-7c97-431d-ad78-34a8bfea439f"), Perf = new Guid("ded574b5-45a0-4f42-8737-46345c09c238");
+  public static string Get() { Guid g; if (PowerGetEffectiveOverlayScheme(out g) != 0) return null; return g == Eff || g == Bat ? "eff" : g == Perf ? "perf" : "bal"; }
+  public static void Set(string m) { PowerSetActiveOverlayScheme(m == "eff" ? Eff : m == "perf" ? Perf : Guid.Empty); }
+}
+// "wifiscan": asks every Wi-Fi adapter to look for networks now (netsh only lists what Windows saw last time).
+// Results land a few seconds later.
+public static class WlanScanner {
+  [DllImport("wlanapi.dll")] static extern int WlanOpenHandle(uint v, IntPtr r, out uint neg, out IntPtr h);
+  [DllImport("wlanapi.dll")] static extern int WlanEnumInterfaces(IntPtr h, IntPtr r, out IntPtr list);
+  [DllImport("wlanapi.dll")] static extern int WlanScan(IntPtr h, ref Guid g, IntPtr ssid, IntPtr ie, IntPtr r);
+  [DllImport("wlanapi.dll")] static extern void WlanFreeMemory(IntPtr p);
+  [DllImport("wlanapi.dll")] static extern int WlanCloseHandle(IntPtr h, IntPtr r);
+  public static void Scan() {
+    uint neg; IntPtr h, list;
+    if (WlanOpenHandle(2, IntPtr.Zero, out neg, out h) != 0) return;
+    try {
+      if (WlanEnumInterfaces(h, IntPtr.Zero, out list) != 0) return;
+      // WLAN_INTERFACE_INFO_LIST: count, index, then 532-byte items that start with the adapter's GUID
+      int n = Marshal.ReadInt32(list);
+      for (int i = 0; i < n; i++) { Guid g = (Guid)Marshal.PtrToStructure(new IntPtr(list.ToInt64() + 8 + i * 532), typeof(Guid)); WlanScan(h, ref g, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero); }
+      WlanFreeMemory(list);
+    } finally { WlanCloseHandle(h, IntPtr.Zero); }
+  }
+}
+'@
+} catch {}
+$lastP = 'x'
+
 function AirplaneOn {
   try { $r = Await ([Windows.Devices.Radios.Radio]::GetRadiosAsync()) $radioList; return (($r.Count -gt 0) -and -not ($r | Where-Object { $_.State -eq 'On' })) }
   catch { return $false }
@@ -192,13 +251,17 @@ while ($true) {
   } catch { $s = $mgr.GetCurrentSession() }
 
   # every command that came in since the last round (dragging the volume slider sends many: only the last one counts)
-  $quit = $false; $newVol = $null
+  $quit = $false; $newVol = $null; $newB = $null
   while ($cmd.IsCompleted) {
     $line = $cmd.Result
     if ($null -eq $line) { $quit = $true; break }   # parent closed stdin: exit
     $cmd = $stdin.ReadLineAsync()
     $line = $line.Trim()
     if ($line -like 'vol *') { $newVol = $line.Substring(4) }
+    elseif ($line -like 'bright *') { $newB = $line.Substring(7) }
+    elseif ($line -match '^radio (WiFi|Bluetooth) (on|off)$') { SetRadio $Matches[1] ($Matches[2] -eq 'on'); $tick = 0; $lastRs = $null }
+    elseif ($line -eq 'wifiscan') { try { [WlanScanner]::Scan() } catch {} }
+    elseif ($line -match '^power (eff|bal|perf)$') { try { [PowerMode]::Set($Matches[1]) } catch {}; $tick = 0 }
     elseif ($line -eq 'mute') { try { [Audio]::Mute = -not [Audio]::Mute } catch {} }
     elseif ($line -eq 'gpu on') { $gpuOn = $true; $gpuTick = 0 }
     elseif ($line -eq 'gpu off') { $gpuOn = $false; foreach ($c in $counters.Values) { $c.Dispose() }; $counters.Clear(); $gpuRefresh = 0 }
@@ -213,6 +276,7 @@ while ($true) {
   }
   if ($quit) { break }
   if ($null -ne $newVol) { try { [Audio]::Volume = [float]::Parse($newVol, [Globalization.CultureInfo]::InvariantCulture) } catch {} }
+  if ($null -ne $newB) { SetBrightness $newB; $tick = 0 }
 
   # system volume: report whenever it changes (hardware keys, other apps, or our own slider)
   try {
@@ -233,6 +297,10 @@ while ($true) {
     if ($a -ne $lastA) { $lastA = $a; Emit @{ type = 'air'; on = $a } }
     $rs = RadioStates
     if ($rs -ne $lastRs) { $lastRs = $rs; $p2 = $rs.Split('|'); Emit @{ type = 'radios'; wifi = $(if ($p2[0]) { $p2[0] } else { $null }); bt = $(if ($p2[1]) { $p2[1] } else { $null }) } }
+    $b = Brightness
+    if ($b -ne $lastB) { $lastB = $b; Emit @{ type = 'bright'; v = $b } }
+    $pm = $null; try { $pm = [PowerMode]::Get() } catch {}
+    if ($pm -ne $lastP) { $lastP = $pm; Emit @{ type = 'power'; mode = $pm } }
     if (-not $s) { Emit @{ type = 'state'; active = $false; sessions = $count } }
     else {
       try {

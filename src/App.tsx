@@ -18,6 +18,8 @@ import StatusDot from './StatusDot'
 import Confetti from './Confetti'
 import Volume from './Volume'
 import Clipboard from './Clipboard'
+import Controls from './Controls'
+import Links from './Links'
 import Focus, { FocusState } from './Focus'
 import { wearing } from './catStyle'
 import { useClaude, lightState } from './useClaude'
@@ -110,6 +112,8 @@ export default function App() {
     clearTimeout(closeTimer.current)
     closeTimer.current = window.setTimeout(() => { if (!hovered.current) { setOpen(false); then?.() } }, ms)
   }
+  // opening a closed island lands on the page picked in Settings ("Last used" leaves it where it was)
+  const openFresh = () => { const t = cfg.current.startTab; if (!openRef.current && t && t !== 'last') setTab(t as TabId) }
   const confetti = () => { if (cfg.current.confetti) window.dispatchEvent(new Event('kitty-confetti')) }
 
   // --- mood overrides ---
@@ -150,7 +154,7 @@ export default function App() {
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000)
-    window.kitty.onToggle(() => setOpen((o) => !o))
+    window.kitty.onToggle(() => { openFresh(); setOpen((o) => !o) })
     window.kitty.onFold(() => { hovered.current = false; setOpen(false); setMenu(false); setVolPop(false) }) // a window is being dragged
     const offGoto = window.kitty.onGoto((id) => { setTab(id as TabId); peek(6000) }) // global shortcuts jump straight to a tab
     window.kitty.usage().then(setUsed)
@@ -324,7 +328,7 @@ export default function App() {
   const dance = settings.dancing && mood === 'listening'
   const look = { body: settings.bodyColor, eyes: settings.eyeColor, outfit: wearing(settings, claude.stats.total, now) }
 
-  const date = now.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }).replace(',', '')
+  const date = now.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short' }).replace(',', '') // no year: the header's half beside the cat is small
   const time = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
   const cur = TABS.find((t) => t.id === tab)!
   const label = (id: string, l: string) => (id === 'chat' ? settings.name : l)
@@ -438,7 +442,7 @@ export default function App() {
         initial={false}
         animate={open ? SIZE.open : hud === 'vol' ? SIZE.hudVol : hud === 'air' || hud === 'hi' ? { width: Math.max(SIZE.hudHi.width, hudW), height: SIZE.closed.height } : { width: restW, height: SIZE.closed.height }}
         transition={spring}
-        onMouseEnter={() => { hovered.current = true; setHud(null); setOpen(true) }}
+        onMouseEnter={() => { hovered.current = true; setHud(null); openFresh(); setOpen(true) }}
         onDragEnter={() => { setOpen(true); setTab('tray') }}
         onMouseLeave={() => { hovered.current = false; setOpen(false); setMenu(false); setVolPop(false) }}
       >
@@ -453,7 +457,7 @@ export default function App() {
           {media.state.playing && settings.musicGlow !== 'off' && <RunningLight mode={settings.musicGlow} palette={settings.musicGlow === 'rainbow' ? RAINBOW : palette} />}
           <div ref={barEl} className={'bar' + (hud && !open ? ' compact' : !open ? ' rest' : '')}>
             {/* open or closed, the cat stays in the middle and the battery right next to it; the date and time sit on the cat's left */}
-            <span className="title" ref={leftEl}>{leftIcons}{open && tab !== 'home' && <>{t1}<span style={{ color: cur.color }}>{t2}</span></>}{open && <span className="grow" />}{open && settings.apps.clock && <span className="clock">{date} <b>{time}</b></span>}{open && settings.hunger && claude.stats.hunger < 100 && <FishTreat hungry={claude.stats.hunger < 10} full={claude.stats.hunger} onFeed={feed} />}</span>
+            <span className="title" ref={leftEl}>{leftIcons}{open && tab !== 'home' && <span className="tname" title={t1 + t2}>{t1}<span style={{ color: cur.color }}>{t2}</span></span>}{open && <span className="grow" />}{open && settings.apps.clock && <span className="clock">{date} <b>{time}</b></span>}</span>
             <span className="mid">
               <span className="pet" onMouseMove={pet}>
                 {hearts.map((h) => <i key={h.id} className="heart" style={{ ['--hx' as string]: h.x + 'px' }}>♥</i>)}
@@ -466,6 +470,7 @@ export default function App() {
                 : hud === 'vol' && !open ? <span className="hud"><span className="hud-track"><i style={{ width: `${(media.vol?.mute ? 0 : media.vol?.v ?? 0) * 100}%` }} /></span><b>{Math.round((media.vol?.mute ? 0 : media.vol?.v ?? 0) * 100)}</b></span>
                 : !open ? place(side.right)
                 : <>
+                    {settings.hunger && claude.stats.hunger < 100 && <FishTreat hungry={claude.stats.hunger < 10} full={claude.stats.hunger} onFeed={feed} />}
                     {items.battery}
                     <span className="grow" />
                     {air && <Plane size={16} color="#ffb04a" aria-label="Airplane mode" />}
@@ -490,6 +495,8 @@ export default function App() {
                       : tab === 'tray' ? <Tray />
                       : tab === 'clipboard' ? <Clipboard />
                       : tab === 'note' ? <Note />
+                      : tab === 'system' ? <Controls media={media} />
+                      : tab === 'links' ? <Links />
                       : <Chat name={settings.name} follow={settings.follow} look={look} mood={mood} setMood={(x) => showMood(x, 6000)} blink={settings.blinking} />}
                   </motion.div>
                 </AnimatePresence>

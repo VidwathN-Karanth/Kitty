@@ -33,6 +33,8 @@ contextBridge.exposeInMainWorld('kitty', {
   // updates, info, misc
   updateStatus: call('update:get'), onUpdate: on('update'), checkUpdate: send('update:check'), installUpdate: send('update:install'),
   info: call('info:get'), onInfo: on('info'), openUrl: send('open:url'),
+  // Control Center + Links
+  wifiList: call('wifi:list'), wifiJoin: (ssid, password, secure) => ipcRenderer.invoke('wifi:join', { ssid, password, secure }), siteInfo: call('site:info'),
   onGoto: on('goto'), onToggle: (cb) => ipcRenderer.on('toggle', cb), onFold: on('fold'), bump: send('stat:bump'), feed: send('cat:feed'),
   stats: call('stats:get'), onStats: on('stats'),
   isPaused: call('paused:get'), onPaused: on('paused'),

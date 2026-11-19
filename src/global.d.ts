@@ -1,5 +1,7 @@
 type MediaState = { active: boolean; title?: string; artist?: string; playing?: boolean; pos?: number; end?: number; app?: string; at?: number; sessions?: number }
-type Media = { state: MediaState; art: { mime: string; data: string } | null; vol: { v: number; mute: boolean } | null; air?: boolean; priv?: { mic: boolean; cam: boolean }; radios?: { wifi: 'connected' | 'on' | 'off' | null; bt: 'on' | 'off' | null } }
+type Media = { state: MediaState; art: { mime: string; data: string } | null; vol: { v: number; mute: boolean } | null; air?: boolean; priv?: { mic: boolean; cam: boolean }; radios?: { wifi: 'connected' | 'on' | 'off' | null; bt: 'on' | 'off' | null }; bright?: number | null; power?: PowerMode | null }
+type PowerMode = 'eff' | 'bal' | 'perf'
+type WifiNet = { ssid: string; signal: number; secure: boolean }
 type ClaudeSession = { id: string; project: string; state: 'idle' | 'working' | 'question' | 'done' | 'error'; step: number; label: string; prompt: string; startedAt: number; endedAt: number | null; updatedAt: number }
 type ClaudeData = { sessions: ClaudeSession[]; stats: { total: number; today: number; streak: number; hunger: number; counters: { focus: number; dj: number; answers: number }; flags: { night?: boolean; early?: boolean; long?: boolean }; runs: { project: string; prompt: string; startedAt: number; ms: number; status: string }[] } }
 type ClaudeEvent = { type: 'question' | 'done' | 'error'; project: string; message?: string; ms?: number }
@@ -17,8 +19,9 @@ type Settings = {
   musicGlow: 'adaptive' | 'rainbow' | 'white' | 'off'; speed: 'fast' | 'normal'; volumeBar: boolean; showBattery: boolean; showWifi: boolean; showBluetooth: boolean; showSpeaker: boolean; notchMode: 'auto' | 'custom'; notchLeft: string[]; notchRight: string[]; batteryWarning: boolean; privacyDot: boolean; weatherCity: string; calendarUrl: string
   startWithWindows: boolean; testMode: boolean
   stats: { cpu: boolean; ram: boolean; gpu: boolean }; statsRest: boolean; statsOpen: boolean; peekOnQuestion: boolean
+  startTab: string // the page the island opens on: a tab id, or 'last' for wherever it was
   shortcuts: Record<ShortcutKey, string>
-  apps: { claude: boolean; music: boolean; chat: boolean; focus: boolean; tray: boolean; clipboard: boolean; note: boolean; clock: boolean }
+  apps: { claude: boolean; music: boolean; chat: boolean; focus: boolean; tray: boolean; clipboard: boolean; note: boolean; clock: boolean; system: boolean; links: boolean }
 }
 type SettingsPatch = Partial<Omit<Settings, 'apps' | 'shortcuts' | 'stats'>> & { apps?: Partial<Settings['apps']>; shortcuts?: Partial<Settings['shortcuts']>; stats?: Partial<Settings['stats']> }
 type SysStats = { cpu: number | null; ram: number | null; ramUsed: number; ramTotal: number; gpu: number | null }
@@ -69,6 +72,9 @@ interface Window {
     info(): Promise<Info>
     onInfo(cb: (i: Info) => void): () => void
     openUrl(url: string): void
+    wifiList(scan?: boolean): Promise<{ current: string | null; nets: WifiNet[]; error?: string; fix?: string }>
+    wifiJoin(ssid: string, password: string | null, secure: boolean): Promise<{ ok?: boolean; needPassword?: boolean; error?: string }>
+    siteInfo(url: string): Promise<{ icon: string | null; title: string }>
     onGoto(cb: (tab: string) => void): () => void
     onToggle(cb: () => void): void
     onFold(cb: () => void): () => void

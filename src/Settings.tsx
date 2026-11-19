@@ -1,8 +1,9 @@
 import { ReactNode, useEffect, useMemo, useState } from 'react'
 import {
   Home, Plug, MessageCircle, LayoutGrid, SlidersHorizontal, Cat as CatIcon, Shirt, Newspaper, Lock, Check, Search, Sun, Moon, Music, Timer,
-  Inbox, Copy, FileText, Clock, Settings as Gear, Sparkles, Bot, ChevronRight, Play,
+  Inbox, Copy, FileText, Clock, Settings as Gear, Sparkles, Bot, ChevronRight, Play, Globe,
 } from 'lucide-react'
+import { TABS } from './tabs'
 import Cat, { EMOTIONS, Mood } from './Cat'
 import ClaudeMark from './ClaudeMark'
 import { useSettings, LIGHT_PRESETS, LIGHT_SWATCHES } from './useSettings'
@@ -53,6 +54,8 @@ const APPS: { id: keyof Settings['apps']; title: string; desc: string; icon: typ
   { id: 'tray', title: 'Tray', desc: 'Drop files into the island and grab them again later.', icon: Inbox, tone: '#6a8cff' },
   { id: 'clipboard', title: 'Clipboard', desc: 'Your last copies. Click one to copy it again.', icon: Copy, tone: '#58b6a0' },
   { id: 'note', title: 'Note', desc: 'One quick note, always at hand.', icon: FileText, tone: '#e8c35a' },
+  { id: 'system', title: 'Control Center', desc: 'Brightness, volume, Wi-Fi (join networks), Bluetooth, mute and power mode.', icon: SlidersHorizontal, tone: '#7fb8ff' },
+  { id: 'links', title: 'Quick Links', desc: 'Your favourite sites with their logos, one click away.', icon: Globe, tone: '#ff8a7a' },
   { id: 'clock', title: 'Clock', desc: 'The date and time in the island header.', icon: Clock, tone: '#8a7eff' },
 ]
 
@@ -177,7 +180,7 @@ export default function SettingsApp() {
     ['kitty', 'Name', 'cat name your name'], ['kitty', 'Traffic-light eyes', 'colours classic soft colour-blind'], ['kitty', 'Faces', 'emotions expressions'], ['kitty', 'Blinking', ''],
     ['kitty', 'Dancing to music', 'headphones'], ['kitty', 'Sleep effect', 'falls asleep idle'], ['kitty', 'Startup animation', 'wave hi'], ['kitty', 'Hunger', 'food'],
     ['kitty', 'Badges', 'achievements'], ['wardrobe', 'Outfit', 'hat sunglasses crown'], ['wardrobe', 'Fur and eye colour', 'body'], ['wardrobe', 'Seasonal outfits', 'santa witch king'],
-    ['apps', 'Apps', 'tabs toggles clock'], ['connections', 'Claude Code', 'hooks connect'], ['ai', 'Chat', 'claude codex'], ['news', 'News', 'whats new'],
+    ['apps', 'Apps', 'tabs toggles clock opens on start page control center wifi brightness links bookmarks'], ['connections', 'Claude Code', 'hooks connect'], ['ai', 'Chat', 'claude codex'], ['news', 'News', 'whats new'],
   ] as [PageId, string, string][], [])
   const hits = find.trim() ? index.filter(([, t, d]) => (t + ' ' + d).toLowerCase().includes(find.trim().toLowerCase())).slice(0, 7) : []
 
@@ -278,6 +281,15 @@ export default function SettingsApp() {
         )}
 
         {page === 'apps' && (
+          <>
+          <Group>
+            <Row title="Opens on" desc="The page the island shows when you open it. Last used keeps wherever you left it.">
+              <select className="pick" value={s.startTab} onChange={(e) => set({ startTab: e.target.value })} aria-label="Opens on">
+                <option value="last">Last used</option>
+                {TABS.filter((t) => t.id === 'home' || s.apps[t.id as keyof Settings['apps']]).map((t) => <option key={t.id} value={t.id}>{t.id === 'chat' ? s.name : t.label}</option>)}
+              </select>
+            </Row>
+          </Group>
           <div className="cards2">
             <div className="app on-always"><div className="ai"><span style={{ background: '#2d3a2d' }}><Bot size={20} color="#9be37a" /></span><div><b>AI assistants</b><small>In your Kitty</small></div><span className="badge">Always on</span></div><p>Claude Code: Kitty shows whether your AI is busy, has a question or is done.</p></div>
             {APPS.map((a) => (
@@ -289,6 +301,7 @@ export default function SettingsApp() {
             <div className="app"><div className="ai"><span style={{ background: '#2a2d33' }}><Gear size={20} /></span><div><b>Settings</b><small>In your Kitty</small></div><span className="badge">Always on</span></div><p>This app. Always there via the gear.</p></div>
             <div className="app ghost"><div className="ai"><span style={{ background: '#2a2d33' }}><Sparkles size={20} /></span><div><b>More apps are coming</b></div></div><p>Got an idea for an app? Tell me.</p></div>
           </div>
+          </>
         )}
 
         {page === 'kitty' && (

@@ -145,3 +145,9 @@ body.sw-body { background: #0d0f12; overflow: hidden; }
 .sw .ne-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--mut); font-size: 13px; }
 .sw .ne-key { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--mut); font-size: 12px; }
 .sw .ne-key span { display: inline-flex; align-items: center; gap: 5px; }
+
+/* a plain dropdown (Apps > Opens on), styled like the buttons around it */
+.sw select.pick { background: var(--ctl); border: 1px solid var(--line); color: var(--text); padding: 8px 12px; border-radius: 10px; font: inherit; font-size: 14px; cursor: pointer; outline: 0; }
+.sw select.pick:focus-visible { border-color: var(--lime); }
+.sw select.pick option { background: var(--ctl); color: var(--text); }
+.sw .group + .cards2 { margin-top: 16px; }

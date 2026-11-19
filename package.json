@@ -53,7 +53,8 @@
       "preload.js",
       "settings.js",
       "updater.js",
-      "usage.js"
+      "usage.js",
+      "wifi.js"
     ],
     "asarUnpack": [
       "bt.ps1",

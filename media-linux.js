@@ -1,5 +1,5 @@
 // Linux twin of media.ps1: same JSON lines on stdout, same commands on stdin (toggle | next | prev | vol <0-1> | mute |
-// gpu on | gpu off). Run by Kitty's own Node (ELECTRON_RUN_AS_NODE). It asks the usual desktop tools and quietly
+// gpu on | gpu off | bright <0-100> | radio WiFi|Bluetooth on|off | power eff|bal|perf). Run by Kitty's own Node (ELECTRON_RUN_AS_NODE). It asks the usual desktop tools and quietly
 // skips whatever a PC doesn't have:
 //   music: playerctl (MPRIS: Spotify, browsers, VLC...)   volume: wpctl (PipeWire) or pactl (PulseAudio)
 //   radios: rfkill + nmcli   microphone in use: pactl   GPU: nvidia-smi or the AMD/Intel busy percentage in /sys
@@ -99,6 +99,32 @@ async function radios() {
   if (!same(r, lastRadios)) { lastRadios = r; emit(r) }
 }
 
+// ---------- Control Center: brightness (brightnessctl) and power mode (powerprofilesctl) ----------
+let lastBright, lastPower
+async function display() {
+  const b = await run('brightnessctl', ['-m']) // "intel_backlight,backlight,cur,65%,max"
+  const v = b ? +(/,(\d+)%/.exec(b)?.[1] ?? NaN) : NaN
+  const bright = Number.isFinite(v) ? v : null
+  if (bright !== lastBright) { lastBright = bright; emit({ type: 'bright', v: bright }) }
+  const p = ((await run('powerprofilesctl', ['get'])) || '').trim()
+  const power = { 'power-saver': 'eff', balanced: 'bal', performance: 'perf' }[p] ?? null
+  if (power !== lastPower) { lastPower = power; emit({ type: 'power', mode: power }) }
+}
+let brightTarget = null, brightBusy = false
+async function setBright(x) { // same "latest value wins" as the volume
+  brightTarget = Math.max(1, Math.min(100, Math.round(+x || 0)))
+  if (brightBusy) return
+  brightBusy = true
+  while (brightTarget !== null) { const v = brightTarget; brightTarget = null; await run('brightnessctl', ['-q', 'set', v + '%']) }
+  brightBusy = false
+  display()
+}
+async function setRadio(kind, on) {
+  if (kind === 'WiFi') { if ((await run('nmcli', ['radio', 'wifi', on ? 'on' : 'off'])) === null) await run('rfkill', [on ? 'unblock' : 'block', 'wlan']) }
+  else { await run('rfkill', [on ? 'unblock' : 'block', 'bluetooth']); if (on) await run('bluetoothctl', ['power', 'on']) }
+  radios()
+}
+
 // ---------- microphone in use (Linux has no general "camera in use" signal, so the camera dot stays off) ----------
 let lastPriv = null
 async function privacy() {
@@ -141,6 +167,9 @@ process.stdin.on('data', (d) => {
     else if (line === 'mute') toggleMute()
     else if (line === 'gpu on') { gpuOn = true; gpu() }
     else if (line === 'gpu off') gpuOn = false
+    else if (line.startsWith('bright ')) setBright(line.slice(7))
+    else if (/^radio (WiFi|Bluetooth) (on|off)$/.test(line)) setRadio(line.split(' ')[1], line.endsWith('on'))
+    else if (/^power (eff|bal|perf)$/.test(line)) run('powerprofilesctl', ['set', { eff: 'power-saver', bal: 'balanced', perf: 'performance' }[line.slice(6)]]).then(display)
   }
 })
 process.stdin.on('end', () => process.exit(0))
@@ -152,3 +181,4 @@ every(700, volume)
 every(3000, radios)
 every(2000, privacy)
 every(2000, gpu)
+every(2000, display)

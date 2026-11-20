@@ -1,7 +1,7 @@
 {
   "name": "kitty",
   "productName": "Kitty",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "private": true,
   "main": "main.js",
   "scripts": {
@@ -16,9 +16,11 @@
     "electron-updater": "^6.8.11",
     "framer-motion": "^14.8.0",
     "lucide-react": "^1.65.0",
+    "mammoth": "^1.13.0",
     "node-ical": "^0.27.3",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "sharp": "^0.35.5"
   },
   "devDependencies": {
     "@types/react": "^19.3.0",
@@ -54,11 +56,16 @@
       "settings.js",
       "updater.js",
       "usage.js",
-      "wifi.js"
+      "wifi.js",
+      "convert.js",
+      "convert.ps1"
     ],
     "asarUnpack": [
       "bt.ps1",
-      "media.ps1"
+      "media.ps1",
+      "convert.ps1",
+      "node_modules/sharp/**",
+      "node_modules/@img/**"
     ],
     "win": {
       "target": [

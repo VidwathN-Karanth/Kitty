@@ -11,7 +11,7 @@ export const DEFAULT_SETTINGS: Settings = {
   startWithWindows: true, testMode: false,
   stats: { cpu: true, ram: true, gpu: true }, statsRest: true, statsOpen: true, peekOnQuestion: true, startTab: 'last',
   shortcuts: { open: 'Ctrl+Alt+T', home: 'Ctrl+Alt+Shift+1', music: 'Ctrl+Alt+Shift+2', claude: 'Ctrl+Alt+Shift+3', focus: 'Ctrl+Alt+Shift+4', clipboard: 'Ctrl+Alt+Shift+5', note: 'Ctrl+Alt+Shift+6' },
-  apps: { claude: true, music: true, chat: true, focus: true, tray: true, clipboard: true, note: true, clock: true, system: true, links: true },
+  apps: { claude: true, music: true, chat: true, focus: true, tray: true, clipboard: true, note: true, clock: true, system: true, links: true, convert: true },
 }
 
 // Settings live in the main process; the island and the Settings window both read them here and stay in sync.

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, globalShortcut, screen, clipboard, shell, powerMonitor, Tray, Menu, nativeImage, net } = require('electron')
+const { app, BrowserWindow, ipcMain, globalShortcut, screen, clipboard, shell, powerMonitor, Tray, Menu, nativeImage, net, dialog } = require('electron')
 const path = require('path')
 const fs = require('fs')
 const { spawn, execFile } = require('child_process')
@@ -9,6 +9,7 @@ const settings = require('./settings')
 const info = require('./info')
 const usage = require('./usage')
 const wifi = require('./wifi')
+const convert = require('./convert')
 
 const LINUX = process.platform === 'linux'
 // Linux: run on X11 (through XWayland on Wayland desktops). Native Wayland doesn't let an app stay on top, sit at the
@@ -193,6 +194,25 @@ ipcMain.handle('site:info', async (_e, u) => {
 })
 
 // ---------- Control Center: Wi-Fi networks (the radios, brightness and power mode go through the media helper) ----------
+// ---------- Convert: images, PDF, Word (convert.js). The job lives there, so it carries on while the island is closed ----------
+convert.start((s) => win?.webContents.send('convert', s))
+ipcMain.handle('convert:get', () => convert.get())
+ipcMain.handle('convert:pick', async () => {
+  const r = await dialog.showOpenDialog({
+    title: 'Choose files to convert', properties: ['openFile', 'multiSelections'],
+    filters: [{ name: 'Images, PDF and Word', extensions: ['png', 'jpg', 'jpeg', 'webp', 'avif', 'gif', 'tif', 'tiff', 'bmp', 'ico', 'heic', 'heif', 'svg', 'pdf', 'docx', 'doc', 'odt', 'rtf'] }, { name: 'All files', extensions: ['*'] }],
+  })
+  if (!r.canceled) convert.add(r.filePaths)
+})
+ipcMain.on('convert:add', (_e, paths) => convert.add(paths))
+ipcMain.on('convert:remove', (_e, p) => convert.remove(p))
+ipcMain.on('convert:clear', () => convert.clear())
+ipcMain.on('convert:set', (_e, p) => convert.set(p && typeof p === 'object' ? p : {}))
+ipcMain.on('convert:run', () => convert.run())
+// only files the converter made can be opened or shown from here
+ipcMain.on('convert:open', (_e, p) => { if (convert.isOutput(p)) shell.openPath(p) })
+ipcMain.on('convert:reveal', (_e, p) => { if (convert.isOutput(p)) shell.showItemInFolder(p) })
+
 ipcMain.handle('wifi:list', (_e, scan) => { if (scan) helper?.stdin.write('wifiscan\n'); return wifi.list() }) // the scan's results show on the next list
 ipcMain.handle('wifi:join', (_e, { ssid, password, secure }) => wifi.join(ssid, password, secure))
 

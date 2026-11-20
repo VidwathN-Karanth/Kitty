@@ -20,6 +20,7 @@ import Volume from './Volume'
 import Clipboard from './Clipboard'
 import Controls from './Controls'
 import Links from './Links'
+import Convert from './Convert'
 import Focus, { FocusState } from './Focus'
 import { wearing } from './catStyle'
 import { useClaude, lightState } from './useClaude'
@@ -90,6 +91,9 @@ export default function App() {
   const [hud, setHud] = useState<Hud>(null) // a quick status shown inside the collapsed notch
   const [tab, setTab] = useState<TabId>('home')
   const [hoverTab, setHoverTab] = useState<TabId | null>(null)
+  // resting on a tab for a moment opens it, no click needed (just passing over one doesn't)
+  const hoverOpen = useRef<number | undefined>(undefined)
+  const hoverTo = (id: TabId | null) => { setHoverTab(id); clearTimeout(hoverOpen.current); if (id) hoverOpen.current = window.setTimeout(() => setTab(id), 200) }
   const { media, tint, palette, bg } = useMedia()
   const hovered = useRef(false)
   const closeTimer = useRef<number | undefined>(undefined)
@@ -444,7 +448,7 @@ export default function App() {
         animate={open ? SIZE.open : hud === 'vol' ? SIZE.hudVol : hud === 'air' || hud === 'hi' ? { width: Math.max(SIZE.hudHi.width, hudW), height: SIZE.closed.height } : { width: restW, height: SIZE.closed.height }}
         transition={spring}
         onMouseEnter={() => { hovered.current = true; setHud(null); openFresh(); setOpen(true) }}
-        onDragEnter={() => { setOpen(true); setTab('tray') }}
+        onDragEnter={() => { setOpen(true); if (tab !== 'convert') setTab('tray') }} // on the Convert page, files are for converting
         onMouseLeave={() => { hovered.current = false; setOpen(false); setMenu(false); setVolPop(false) }}
       >
         <i className="ear l" /><i className="ear r" />
@@ -498,15 +502,16 @@ export default function App() {
                       : tab === 'note' ? <Note />
                       : tab === 'system' ? <Controls media={media} />
                       : tab === 'links' ? <Links />
+                      : tab === 'convert' ? <Convert />
                       : <Chat name={settings.name} follow={settings.follow} look={look} mood={mood} setMood={(x) => showMood(x, 6000)} blink={settings.blinking} />}
                   </motion.div>
                 </AnimatePresence>
               </div>
-              <div className="tabs" onMouseLeave={() => setHoverTab(null)}>
+              <div className="tabs" onMouseLeave={() => hoverTo(null)}>
                 {tabs.map((t) => {
                   const on = t.id === tab
                   return (
-                    <button key={t.id} className={'tab' + (hoverTab === t.id ? ' hov' : '')} onClick={() => setTab(t.id)} onMouseEnter={() => setHoverTab(t.id)} style={{ color: on ? t.color : hoverTab === t.id ? '#e6e6e6' : '#8a8a8a' }} aria-label={t.label}>
+                    <button key={t.id} className={'tab' + (hoverTab === t.id ? ' hov' : '')} onClick={() => setTab(t.id)} onMouseEnter={() => hoverTo(t.id)} style={{ color: on ? t.color : hoverTab === t.id ? '#e6e6e6' : '#8a8a8a' }} aria-label={t.label}>
                       {/* one frosted pill glides from icon to icon under the cursor */}
                       <AnimatePresence>
                         {hoverTab === t.id && <motion.span layoutId="hoverpill" className="hpill" initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.85 }} transition={{ type: 'spring', stiffness: 520, damping: 36, mass: 0.6 }} />}

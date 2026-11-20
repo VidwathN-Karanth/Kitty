@@ -21,9 +21,12 @@ type Settings = {
   stats: { cpu: boolean; ram: boolean; gpu: boolean }; statsRest: boolean; statsOpen: boolean; peekOnQuestion: boolean
   startTab: string // the page the island opens on: a tab id, or 'last' for wherever it was
   shortcuts: Record<ShortcutKey, string>
-  apps: { claude: boolean; music: boolean; chat: boolean; focus: boolean; tray: boolean; clipboard: boolean; note: boolean; clock: boolean; system: boolean; links: boolean }
+  apps: { claude: boolean; music: boolean; chat: boolean; focus: boolean; tray: boolean; clipboard: boolean; note: boolean; clock: boolean; system: boolean; links: boolean; convert: boolean }
 }
 type SettingsPatch = Partial<Omit<Settings, 'apps' | 'shortcuts' | 'stats'>> & { apps?: Partial<Settings['apps']>; shortcuts?: Partial<Settings['shortcuts']>; stats?: Partial<Settings['stats']> }
+type ConvertFile = { path: string; name: string; size: number; format: string | null }
+type ConvertResult = { status: 'waiting' | 'working' | 'done' | 'error' | 'skip'; out?: string; error?: string }
+type ConvertState = { files: ConvertFile[]; from: string; to: string | null; combine: boolean; running: boolean; results: Record<string, ConvertResult>; toOptions: string[]; detected: string | null; mixed: boolean }
 type SysStats = { cpu: number | null; ram: number | null; ramUsed: number; ramTotal: number; gpu: number | null }
 
 interface Window {
@@ -74,6 +77,16 @@ interface Window {
     openUrl(url: string): void
     wifiList(scan?: boolean): Promise<{ current: string | null; nets: WifiNet[]; error?: string; fix?: string }>
     wifiJoin(ssid: string, password: string | null, secure: boolean): Promise<{ ok?: boolean; needPassword?: boolean; error?: string }>
+    convert(): Promise<ConvertState>
+    onConvert(cb: (s: ConvertState) => void): () => void
+    convertPick(): Promise<void>
+    convertAdd(paths: string[]): void
+    convertRemove(path: string): void
+    convertClear(): void
+    convertSet(p: { from?: string; to?: string | null; combine?: boolean }): void
+    convertRun(): void
+    convertOpen(path: string): void
+    convertReveal(path: string): void
     siteInfo(url: string): Promise<{ icon: string | null; title: string }>
     onGoto(cb: (tab: string) => void): () => void
     onToggle(cb: () => void): void

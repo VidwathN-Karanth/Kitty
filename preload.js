@@ -9,7 +9,8 @@ document.addEventListener('dragover', (e) => e.preventDefault())
 document.addEventListener('drop', (e) => {
   e.preventDefault()
   const paths = [...(e.dataTransfer?.files ?? [])].map((f) => webUtils.getPathForFile(f)).filter(Boolean)
-  if (paths.length) ipcRenderer.send('tray:add', paths)
+  // dropped on the Convert page: those files are to convert; anywhere else they go to the file tray
+  if (paths.length) ipcRenderer.send(e.target instanceof Element && e.target.closest('[data-drop="convert"]') ? 'convert:add' : 'tray:add', paths)
 })
 
 contextBridge.exposeInMainWorld('kitty', {
@@ -33,6 +34,9 @@ contextBridge.exposeInMainWorld('kitty', {
   // updates, info, misc
   updateStatus: call('update:get'), onUpdate: on('update'), checkUpdate: send('update:check'), installUpdate: send('update:install'),
   info: call('info:get'), onInfo: on('info'), openUrl: send('open:url'),
+  // Convert
+  convert: call('convert:get'), onConvert: on('convert'), convertPick: call('convert:pick'), convertAdd: send('convert:add'), convertRemove: send('convert:remove'),
+  convertClear: send('convert:clear'), convertSet: send('convert:set'), convertRun: send('convert:run'), convertOpen: send('convert:open'), convertReveal: send('convert:reveal'),
   // Control Center + Links
   wifiList: call('wifi:list'), wifiJoin: (ssid, password, secure) => ipcRenderer.invoke('wifi:join', { ssid, password, secure }), siteInfo: call('site:info'),
   onGoto: on('goto'), onToggle: (cb) => ipcRenderer.on('toggle', cb), onFold: on('fold'), bump: send('stat:bump'), feed: send('cat:feed'),

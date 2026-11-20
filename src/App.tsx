@@ -89,6 +89,7 @@ export default function App() {
   const [volPop, setVolPop] = useState(false)
   const [hud, setHud] = useState<Hud>(null) // a quick status shown inside the collapsed notch
   const [tab, setTab] = useState<TabId>('home')
+  const [hoverTab, setHoverTab] = useState<TabId | null>(null)
   const { media, tint, palette, bg } = useMedia()
   const hovered = useRef(false)
   const closeTimer = useRef<number | undefined>(undefined)
@@ -501,11 +502,15 @@ export default function App() {
                   </motion.div>
                 </AnimatePresence>
               </div>
-              <div className="tabs">
+              <div className="tabs" onMouseLeave={() => setHoverTab(null)}>
                 {tabs.map((t) => {
                   const on = t.id === tab
                   return (
-                    <button key={t.id} className="tab" onClick={() => setTab(t.id)} style={{ color: on ? t.color : '#8a8a8a' }} aria-label={t.label}>
+                    <button key={t.id} className={'tab' + (hoverTab === t.id ? ' hov' : '')} onClick={() => setTab(t.id)} onMouseEnter={() => setHoverTab(t.id)} style={{ color: on ? t.color : hoverTab === t.id ? '#e6e6e6' : '#8a8a8a' }} aria-label={t.label}>
+                      {/* one frosted pill glides from icon to icon under the cursor */}
+                      <AnimatePresence>
+                        {hoverTab === t.id && <motion.span layoutId="hoverpill" className="hpill" initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.85 }} transition={{ type: 'spring', stiffness: 520, damping: 36, mass: 0.6 }} />}
+                      </AnimatePresence>
                       {on && <motion.span layoutId="pill" className="pill" style={{ background: t.color + '2e' }} transition={spring} />}
                       <t.icon size={18} style={{ position: 'relative' }} />
                       {on && <span style={{ position: 'relative' }}>{label(t.id, t.label)}</span>}

@@ -1,5 +1,5 @@
 // Linux twin of media.ps1: same JSON lines on stdout, same commands on stdin (toggle | next | prev | vol <0-1> | mute |
-// gpu on | gpu off | bright <0-100> | radio WiFi|Bluetooth on|off | power eff|bal|perf). Run by Kitty's own Node (ELECTRON_RUN_AS_NODE). It asks the usual desktop tools and quietly
+// gpu on | gpu off | bright <0-100> | radio WiFi|Bluetooth on|off | power eff|bal|perf | night on|off). Run by Kitty's own Node (ELECTRON_RUN_AS_NODE). It asks the usual desktop tools and quietly
 // skips whatever a PC doesn't have:
 //   music: playerctl (MPRIS: Spotify, browsers, VLC...)   volume: wpctl (PipeWire) or pactl (PulseAudio)
 //   radios: rfkill + nmcli   microphone in use: pactl   GPU: nvidia-smi or the AMD/Intel busy percentage in /sys
@@ -100,7 +100,8 @@ async function radios() {
 }
 
 // ---------- Control Center: brightness (brightnessctl) and power mode (powerprofilesctl) ----------
-let lastBright, lastPower
+let lastBright, lastPower, lastNight
+const NIGHT = ['org.gnome.settings-daemon.plugins.color', 'night-light-enabled']
 async function display() {
   const b = await run('brightnessctl', ['-m']) // "intel_backlight,backlight,cur,65%,max"
   const v = b ? +(/,(\d+)%/.exec(b)?.[1] ?? NaN) : NaN
@@ -109,6 +110,9 @@ async function display() {
   const p = ((await run('powerprofilesctl', ['get'])) || '').trim()
   const power = { 'power-saver': 'eff', balanced: 'bal', performance: 'perf' }[p] ?? null
   if (power !== lastPower) { lastPower = power; emit({ type: 'power', mode: power }) }
+  const n = ((await run('gsettings', ['get', NIGHT[0], NIGHT[1]])) || '').trim() // GNOME's night light
+  const night = n === 'true' ? true : n === 'false' ? false : null
+  if (night !== lastNight) { lastNight = night; emit({ type: 'night', on: night }) }
 }
 let brightTarget = null, brightBusy = false
 async function setBright(x) { // same "latest value wins" as the volume
@@ -169,6 +173,7 @@ process.stdin.on('data', (d) => {
     else if (line === 'gpu off') gpuOn = false
     else if (line.startsWith('bright ')) setBright(line.slice(7))
     else if (/^radio (WiFi|Bluetooth) (on|off)$/.test(line)) setRadio(line.split(' ')[1], line.endsWith('on'))
+    else if (/^night (on|off)$/.test(line)) run('gsettings', ['set', ...NIGHT, String(line.endsWith('on'))]).then(display)
     else if (/^power (eff|bal|perf)$/.test(line)) run('powerprofilesctl', ['set', { eff: 'power-saver', bal: 'balanced', perf: 'performance' }[line.slice(6)]]).then(display)
   }
 })

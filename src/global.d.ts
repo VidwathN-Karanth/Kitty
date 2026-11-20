@@ -1,5 +1,5 @@
 type MediaState = { active: boolean; title?: string; artist?: string; playing?: boolean; pos?: number; end?: number; app?: string; at?: number; sessions?: number }
-type Media = { state: MediaState; art: { mime: string; data: string } | null; vol: { v: number; mute: boolean } | null; air?: boolean; priv?: { mic: boolean; cam: boolean }; radios?: { wifi: 'connected' | 'on' | 'off' | null; bt: 'on' | 'off' | null }; bright?: number | null; power?: PowerMode | null }
+type Media = { state: MediaState; art: { mime: string; data: string } | null; vol: { v: number; mute: boolean } | null; air?: boolean; priv?: { mic: boolean; cam: boolean }; radios?: { wifi: 'connected' | 'on' | 'off' | null; bt: 'on' | 'off' | null }; bright?: number | null; power?: PowerMode | null; night?: boolean | null; nightStrength?: number | null }
 type PowerMode = 'eff' | 'bal' | 'perf'
 type WifiNet = { ssid: string; signal: number; secure: boolean }
 type ClaudeSession = { id: string; project: string; state: 'idle' | 'working' | 'question' | 'done' | 'error'; step: number; label: string; prompt: string; startedAt: number; endedAt: number | null; updatedAt: number }

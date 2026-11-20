@@ -563,3 +563,29 @@ button:focus-visible, [role='button']:focus-visible { outline: 2px solid #ffffff
 
 /* Home music card: the song title is clipped cleanly at two lines (no third line peeking out) */
 .hc-song b { max-height: 2.4em; }
+
+/* ======================= Night light panel ======================= */
+.np { display: flex; flex-direction: column; gap: 10px; height: 180px; }
+.np-switch { position: relative; width: 46px; height: 26px; border: 0; border-radius: 999px; background: #ffffff24; cursor: pointer; padding: 0; transition: background 220ms var(--ease); margin-right: 4px; }
+.np-switch i { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px #0006; transition: transform 240ms var(--ease); }
+.np-switch.on { background: #f0b44a; }
+.np-switch.on i { transform: translateX(20px); }
+.np-card { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px 12px; border-radius: 20px; background: linear-gradient(150deg, #f0b44a1f, #ffffff08); box-shadow: inset 0 0 0 1px #f0b44a33; transition: opacity 220ms, filter 220ms; }
+.np-card.off { filter: saturate(0.4); opacity: 0.75; }
+.np-row { display: flex; align-items: center; justify-content: space-between; font-size: 13.5px; }
+.np-row span { display: flex; align-items: center; gap: 8px; color: #ffffffcc; font-weight: 600; }
+.np-row span svg { color: #f0b44a; }
+.np-row b { font-size: 15px; font-variant-numeric: tabular-nums; }
+.vs.hs { height: 28px; border-radius: 999px; padding: 0; cursor: ew-resize; background: linear-gradient(90deg, #ffffff14, #ffffff0a); }
+.vs.hs .vs-fill { background: linear-gradient(90deg, #ffe2a8, #f0b44a 55%, #ff8a3d); transform-origin: left; transform: scaleX(var(--p)); border-radius: 0; }
+.vs.hs:active { transform: scale(0.99); }
+.np-scale { display: flex; justify-content: space-between; font-size: 11.5px; color: #ffffff70; }
+.np-note { font-size: 12.5px; color: #ffffff90; }
+.np-link { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; color: #ffffffa0; font-size: 12.5px; cursor: pointer; padding: 6px 8px; border-radius: 10px; transition: background 150ms, color 150ms; }
+.np-link:hover { background: #ffffff10; color: #fff; }
+
+/* tile arrows (› for more, ↗ for Settings) both sit in the top-right corner, so the names keep the full width */
+.qt-more { top: 5px; right: 5px; transform: none; width: 26px; height: 26px; border-radius: 50%; }
+.qt-txt { padding-right: 2px; }
+.qt-more { top: auto; bottom: 7px; right: 6px; width: 24px; height: 24px; }
+.qt-wrap:has(.qt-more) .qt-txt small { padding-right: 20px; }

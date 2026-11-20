@@ -8,7 +8,8 @@ const POWER: [PowerMode, string][] = [['eff', 'Battery'], ['bal', 'Balanced'], [
 
 // A tall slider like a phone's control centre: press anywhere and drag. It follows the hand right away (transform
 // only, so it stays smooth) and sends at most one value every 60 ms; the last one always goes out on release.
-function VSlider({ value, onChange, icon, label }: { value: number; onChange: (v: number) => void; icon: ReactNode; label: string }) {
+// `wide` lays it on its side (the night light strength bar).
+function VSlider({ value, onChange, icon, label, wide }: { value: number; onChange: (v: number) => void; icon?: ReactNode; label: string; wide?: boolean }) {
   const [drag, setDrag] = useState<number | null>(null)
   const held = useRef(false), last = useRef(0), settle = useRef<number | undefined>(undefined)
   const v = drag ?? value
@@ -17,9 +18,9 @@ function VSlider({ value, onChange, icon, label }: { value: number; onChange: (v
     if (now || performance.now() - last.current > 60) { last.current = performance.now(); onChange(x) }
     if (!held.current) settle.current = window.setTimeout(() => setDrag(null), 500) // let the system's own value catch up
   }
-  const at = (e: React.PointerEvent<HTMLDivElement>) => { const r = e.currentTarget.getBoundingClientRect(); return clamp((r.bottom - e.clientY) / r.height) }
+  const at = (e: React.PointerEvent<HTMLDivElement>) => { const r = e.currentTarget.getBoundingClientRect(); return clamp(wide ? (e.clientX - r.left) / r.width : (r.bottom - e.clientY) / r.height) }
   return (
-    <div className={'vs' + (held.current ? ' drag' : '')} style={{ ['--p' as string]: v }} role="slider" tabIndex={0} aria-label={label}
+    <div className={(wide ? 'vs hs' : 'vs') + (held.current ? ' drag' : '')} style={{ ['--p' as string]: v }} role="slider" tabIndex={0} aria-label={label}
       aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(v * 100)}
       onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); held.current = true; go(at(e), true) }}
       onPointerMove={(e) => { if (held.current) go(at(e)) }}
@@ -28,8 +29,7 @@ function VSlider({ value, onChange, icon, label }: { value: number; onChange: (v
       onWheel={(e) => go(clamp(v - Math.sign(e.deltaY) * 0.05), true)}
       onKeyDown={(e) => { const d = e.key === 'ArrowUp' || e.key === 'ArrowRight' ? 0.05 : e.key === 'ArrowDown' || e.key === 'ArrowLeft' ? -0.05 : 0; if (d) { e.preventDefault(); go(clamp(v + d), true) } }}>
       <i className="vs-fill" />
-      <b>{Math.round(v * 100)}%</b>
-      <span className="vs-ico">{icon}</span>
+      {!wide && <><b>{Math.round(v * 100)}%</b><span className="vs-ico">{icon}</span></>}
     </div>
   )
 }
@@ -106,14 +106,36 @@ function Networks({ back }: { back: () => void }) {
   )
 }
 
+// Night light: on/off and its strength (0-100, the same Strength as in Windows Settings)
+function NightPanel({ on, strength, back, toggle }: { on: boolean; strength: number | null; back: () => void; toggle: () => void }) {
+  const [shown, setShown] = useState(strength ?? 50) // follows the bar while dragging, then the PC's own value
+  useEffect(() => { if (strength != null) setShown(strength) }, [strength])
+  return (
+    <div className="np">
+      <div className="nets-head">
+        <button onClick={back} className="nets-back"><ChevronLeft size={16} />Night light</button>
+        <button className={'np-switch' + (on ? ' on' : '')} role="switch" aria-checked={on} aria-label="Night light" onClick={toggle}><i /></button>
+      </div>
+      <div className={'np-card' + (on ? '' : ' off')}>
+        <div className="np-row"><span><Moon size={15} />Strength</span><b>{shown}%</b></div>
+        {strength != null
+          ? <VSlider wide label="Night light strength" value={strength / 100} onChange={(x) => { const n = Math.round(x * 100); setShown(n); window.kitty.mediaCmd(`nightstr ${n}`) }} />
+          : <small className="np-note">The strength can't be changed from here on this PC.</small>}
+        <div className="np-scale"><span>Less warm</span><span>{on ? '' : 'Turn it on to see the change'}</span><span>Warmer</span></div>
+      </div>
+      {WIN && <button className="np-link" onClick={() => window.kitty.openUrl('ms-settings:nightlight')}>Schedule and more in Windows Settings<ArrowUpRight size={13} /></button>}
+    </div>
+  )
+}
+
 // Control Center: brightness + volume sliders, Wi-Fi / Bluetooth / mute that really switch the PC's own, power mode,
-// and shortcuts into Windows Settings for what Windows doesn't let apps switch (night light, display, sound output).
+// night light, and shortcuts into Windows Settings for what Windows doesn't let apps switch (display, sound output).
 export default function Controls({ media }: { media: Media }) {
-  const [page, setPage] = useState<'main' | 'wifi'>('main')
-  const [pend, setPend] = useState<{ wifi?: boolean; bt?: boolean; power?: PowerMode }>({}) // shown right away, until the PC reports back
+  const [page, setPage] = useState<'main' | 'wifi' | 'night'>('main')
+  const [pend, setPend] = useState<{ wifi?: boolean; bt?: boolean; power?: PowerMode; night?: boolean }>({}) // shown right away, until the PC reports back
   const [ssid, setSsid] = useState<string | null>(null)
   const r = media.radios
-  useEffect(() => setPend({}), [r?.wifi, r?.bt, media.power])
+  useEffect(() => setPend({}), [r?.wifi, r?.bt, media.power, media.night])
   useEffect(() => { window.kitty.wifiList().then((x) => setSsid(x.current)).catch(() => {}) }, [r?.wifi])
   const later = (k: keyof typeof pend) => setTimeout(() => setPend((p) => ({ ...p, [k]: undefined })), 8000)
   const radio = (k: 'wifi' | 'bt', on: boolean) => {
@@ -125,13 +147,17 @@ export default function Controls({ media }: { media: Media }) {
   const muted = !!media.vol?.mute
   const power = pend.power ?? media.power
   const hasBright = typeof media.bright === 'number'
+  const night = pend.night ?? media.night
+  const hasNight = typeof media.night === 'boolean'
 
+  const toggleNight = () => { const on = !night; setPend((p) => ({ ...p, night: on })); later('night'); window.kitty.mediaCmd(`night ${on ? 'on' : 'off'}`) }
   if (page === 'wifi') return <Networks back={() => setPage('main')} />
+  if (page === 'night') return <NightPanel on={!!night} strength={media.nightStrength ?? null} back={() => setPage('main')} toggle={toggleNight} />
   return (
     <div className="qs" style={{ gridTemplateColumns: hasBright ? '62px 62px 1fr' : '62px 1fr' }}>
       {hasBright && <VSlider label="Brightness" value={media.bright! / 100} onChange={(x) => window.kitty.mediaCmd(`bright ${Math.max(1, Math.round(x * 100))}`)} icon={<Sun size={18} />} />}
       <VSlider label="Volume" value={media.vol?.v ?? 0} onChange={(x) => window.kitty.mediaCmd(`vol ${x.toFixed(3)}`)} icon={muted ? <VolumeX size={18} /> : <Volume2 size={18} />} />
-      <div className="qs-grid" style={{ gridTemplateRows: [WIN && '1fr', '1fr', power && 'auto'].filter(Boolean).join(' ') }}>
+      <div className="qs-grid" style={{ gridTemplateRows: [(WIN || hasNight) && '1fr', '1fr', power && 'auto'].filter(Boolean).join(' ') }}>
         <Tile on={wifiOn} color="#4f9dff" icon={wifiOn ? <Wifi size={16} /> : <WifiOff size={16} />} title="Wi-Fi"
           sub={!r?.wifi ? 'Not found' : !wifiOn ? 'Off' : r.wifi === 'connected' ? ssid ?? 'Connected' : 'Not connected'}
           onClick={() => r?.wifi && radio('wifi', !wifiOn)} more={r?.wifi ? () => setPage('wifi') : undefined} />
@@ -139,8 +165,12 @@ export default function Controls({ media }: { media: Media }) {
           sub={!r?.bt ? 'Not found' : btOn ? 'On' : 'Off'} onClick={() => r?.bt && radio('bt', !btOn)}
           more={WIN ? () => window.kitty.openUrl('ms-settings:bluetooth') : undefined} />
         <Tile on={muted} color="#ff5a4a" icon={muted ? <VolumeX size={16} /> : <Volume2 size={16} />} title="Mute" sub={muted ? 'Muted' : 'Sound on'} onClick={() => window.kitty.mediaCmd('mute')} />
+        {hasNight
+          ? <Tile on={!!night} color="#f0b44a" icon={<Moon size={16} />} title="Night light"
+              sub={(night ? 'On' : 'Off') + (media.nightStrength != null ? ` · ${media.nightStrength}%` : '')}
+              onClick={toggleNight} more={() => setPage('night')} />
+          : WIN && <Tile link color="#f0b44a" icon={<Moon size={16} />} title="Night light" sub="Settings" onClick={() => window.kitty.openUrl('ms-settings:nightlight')} />}
         {WIN && <>
-          <Tile link color="#f0b44a" icon={<Moon size={16} />} title="Night light" sub="Settings" onClick={() => window.kitty.openUrl('ms-settings:nightlight')} />
           <Tile link color="#b79bff" icon={<MonitorCog size={16} />} title="Display" sub="Settings" onClick={() => window.kitty.openUrl('ms-settings:display')} />
           <Tile link color="#6fd0a0" icon={<Speaker size={16} />} title="Sound" sub="Output" onClick={() => window.kitty.openUrl('ms-settings:sound')} />
         </>}

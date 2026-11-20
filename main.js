@@ -304,6 +304,7 @@ function startMedia() {
         else if (m.type === 'vol') media.vol = { v: m.v, mute: m.mute }
         else if (m.type === 'bright') media.bright = m.v
         else if (m.type === 'power') media.power = m.mode
+        else if (m.type === 'night') { media.night = m.on; media.nightStrength = m.strength ?? null }
         else if (m.type === 'art') media.art = { mime: m.mime, data: m.data }
         else if (m.type === 'gpu') { sysStats.gpu = m.gpu; continue }
         else if (m.type === 'windrag' || m.type === 'snip') { stepAside(m.type, m.on); continue }

@@ -1,6 +1,6 @@
 # Long-running helper: reports the current Windows media session (Spotify, browser, ...) as JSON lines on stdout
 # and accepts commands on stdin: toggle | next | prev | vol <0-1> | mute | gpu on|off | bright <0-100> |
-# radio WiFi|Bluetooth on|off | power eff|bal|perf.
+# radio WiFi|Bluetooth on|off | power eff|bal|perf | night on|off | nightstr <0-100> | wifiscan.
 [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
 Add-Type -AssemblyName System.Runtime.WindowsRuntime
 $null = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType = WindowsRuntime]
@@ -131,16 +131,34 @@ function SetBrightness($n) {
 }
 
 # Windows 11 power mode (Settings > Power): efficiency | balanced | performance. null when the PC has no power modes
-# (a custom power plan is active).
+# (a custom power plan is active). Windows 11 keeps one mode for "plugged in" and one for "on battery", exactly like
+# Settings shows them; the mode for the current power source is read and set. Older Windows 11 builds without those
+# calls fall back to the single overlay.
 try {
   Add-Type -TypeDefinition @'
 using System; using System.Runtime.InteropServices;
 public static class PowerMode {
-  [DllImport("powrprof.dll")] static extern uint PowerGetEffectiveOverlayScheme(out Guid g);
+  [StructLayout(LayoutKind.Sequential)] struct SPS { public byte AC, Flag, Pct, SysFlag; public int Life, Full; }
+  [DllImport("kernel32.dll")] static extern bool GetSystemPowerStatus(out SPS s);
+  [DllImport("powrprof.dll")] static extern uint PowerGetActualOverlayScheme(out Guid g);
   [DllImport("powrprof.dll")] static extern uint PowerSetActiveOverlayScheme(Guid g);
+  [DllImport("powrprof.dll")] static extern uint PowerGetUserConfiguredACPowerMode(out Guid g);
+  [DllImport("powrprof.dll")] static extern uint PowerGetUserConfiguredDCPowerMode(out Guid g);
+  [DllImport("powrprof.dll")] static extern uint PowerSetUserConfiguredACPowerMode(ref Guid g);
+  [DllImport("powrprof.dll")] static extern uint PowerSetUserConfiguredDCPowerMode(ref Guid g);
   static readonly Guid Eff = new Guid("961cc777-2547-4f9d-8174-7d86181b8a7a"), Bat = new Guid("3af9b8d9-7c97-431d-ad78-34a8bfea439f"), Perf = new Guid("ded574b5-45a0-4f42-8737-46345c09c238");
-  public static string Get() { Guid g; if (PowerGetEffectiveOverlayScheme(out g) != 0) return null; return g == Eff || g == Bat ? "eff" : g == Perf ? "perf" : "bal"; }
-  public static void Set(string m) { PowerSetActiveOverlayScheme(m == "eff" ? Eff : m == "perf" ? Perf : Guid.Empty); }
+  static bool OnAC() { SPS s; return !GetSystemPowerStatus(out s) || s.AC != 0; }
+  static string Name(Guid g) { return g == Eff || g == Bat ? "eff" : g == Perf ? "perf" : "bal"; }
+  public static string Get() {
+    Guid g;
+    try { if ((OnAC() ? PowerGetUserConfiguredACPowerMode(out g) : PowerGetUserConfiguredDCPowerMode(out g)) == 0) return Name(g); } catch (EntryPointNotFoundException) {}
+    return PowerGetActualOverlayScheme(out g) == 0 ? Name(g) : null;
+  }
+  public static void Set(string m) {
+    Guid g = m == "eff" ? Eff : m == "perf" ? Perf : Guid.Empty;
+    try { if ((OnAC() ? PowerSetUserConfiguredACPowerMode(ref g) : PowerSetUserConfiguredDCPowerMode(ref g)) == 0) return; } catch (EntryPointNotFoundException) {}
+    PowerSetActiveOverlayScheme(g);
+  }
 }
 // "wifiscan": asks every Wi-Fi adapter to look for networks now (netsh only lists what Windows saw last time).
 // Results land a few seconds later.
@@ -165,6 +183,80 @@ public static class WlanScanner {
 '@
 } catch {}
 $lastP = 'x'
+
+# Night light, switched the way Quick Settings does it: through Windows Settings' own handler for the setting
+# (SettingsHandlers_Display.dll, GetSetting -> ISettingItem, value "Value" as a boxed bool). The registry record it
+# keeps is only a copy: writing it does nothing on Windows 11 24H2+. The switch finishes in the background inside
+# this process, which is fine here because the helper keeps running.
+# ponytail: undocumented COM layout (vtable slots checked: 6 = Id, 13 = GetValue, 14 = SetValue); if a Windows update
+# changes it, Night() returns null and the tile goes back to opening Settings.
+try {
+  Add-Type -TypeDefinition @'
+using System; using System.Runtime.InteropServices;
+public static class NightLight {
+  [DllImport("combase.dll")] static extern int WindowsCreateString([MarshalAs(UnmanagedType.LPWStr)] string s, int len, out IntPtr h);
+  [DllImport("combase.dll")] static extern IntPtr WindowsGetStringRawBuffer(IntPtr h, out int len);
+  [DllImport("combase.dll")] static extern int RoGetActivationFactory(IntPtr cls, ref Guid iid, out IntPtr f);
+  [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] static extern IntPtr LoadLibrary(string p);
+  [DllImport("kernel32.dll", CharSet = CharSet.Ansi)] static extern IntPtr GetProcAddress(IntPtr m, string n);
+  [UnmanagedFunctionPointer(CallingConvention.StdCall)] delegate int GetSettingFn(IntPtr id, out IntPtr item, IntPtr r);
+  [UnmanagedFunctionPointer(CallingConvention.StdCall)] delegate int GetStr(IntPtr self, out IntPtr h);
+  [UnmanagedFunctionPointer(CallingConvention.StdCall)] delegate int GetBool(IntPtr self, out byte v);
+  [UnmanagedFunctionPointer(CallingConvention.StdCall)] delegate int GetVal(IntPtr self, IntPtr name, out IntPtr v);
+  [UnmanagedFunctionPointer(CallingConvention.StdCall)] delegate int SetVal(IntPtr self, IntPtr name, IntPtr v);
+  [UnmanagedFunctionPointer(CallingConvention.StdCall)] delegate int MakeBool(IntPtr self, byte v, out IntPtr o);
+  [UnmanagedFunctionPointer(CallingConvention.StdCall)] delegate int GetU32(IntPtr self, out uint v);
+  [UnmanagedFunctionPointer(CallingConvention.StdCall)] delegate int MakeU32(IntPtr self, uint v, out IntPtr o);
+  // On/off, and the strength (0-100, the Strength slider in Settings)
+  const string Toggle = "SystemSettings_Display_BlueLight_ManualToggleQuickAction", Strength = "SystemSettings_Display_BlueLight_ColorTemperature";
+  static readonly System.Collections.Generic.Dictionary<string, IntPtr> items = new System.Collections.Generic.Dictionary<string, IntPtr>();
+  static T Fn<T>(IntPtr o, int slot) { return (T)(object)Marshal.GetDelegateForFunctionPointer(Marshal.ReadIntPtr(Marshal.ReadIntPtr(o), slot * IntPtr.Size), typeof(T)); }
+  static IntPtr H(string s) { IntPtr h; WindowsCreateString(s, s.Length, out h); return h; }
+  static IntPtr Item(string id) {
+    IntPtr it;
+    if (items.TryGetValue(id, out it)) return it;
+    items[id] = IntPtr.Zero; // asked once: a failure stays a failure
+    IntPtr m = LoadLibrary(System.IO.Path.Combine(Environment.SystemDirectory, "SettingsHandlers_Display.dll"));
+    IntPtr p = m == IntPtr.Zero ? IntPtr.Zero : GetProcAddress(m, "GetSetting");
+    if (p == IntPtr.Zero) return IntPtr.Zero;
+    if (((GetSettingFn)Marshal.GetDelegateForFunctionPointer(p, typeof(GetSettingFn)))(H(id), out it, IntPtr.Zero) != 0) return IntPtr.Zero;
+    IntPtr hs; int n; // the item must name itself: proves the layout is the one we know
+    if (Fn<GetStr>(it, 6)(it, out hs) != 0 || Marshal.PtrToStringUni(WindowsGetStringRawBuffer(hs, out n), n) != id) return IntPtr.Zero;
+    return items[id] = it;
+  }
+  static IntPtr Value(string id) { // the setting's value as an IPropertyValue
+    IntPtr it = Item(id), v, pv; Guid ipv = new Guid("4BD682DD-7554-40E9-9A9B-82654EDE7E62");
+    if (it == IntPtr.Zero || Fn<GetVal>(it, 13)(it, H("Value"), out v) != 0 || Marshal.QueryInterface(v, ref ipv, out pv) != 0) return IntPtr.Zero;
+    return pv;
+  }
+  static void Put(string id, Func<IntPtr, IntPtr> box) {
+    IntPtr it = Item(id); if (it == IntPtr.Zero) return;
+    Guid iid = new Guid("629BDBC8-D932-4FF4-96B9-8D96C5C1E858"); IntPtr f;
+    if (RoGetActivationFactory(H("Windows.Foundation.PropertyValue"), ref iid, out f) != 0) return;
+    IntPtr b = box(f); if (b != IntPtr.Zero) Fn<SetVal>(it, 14)(it, H("Value"), b);
+  }
+  // true / false, or null when the switch isn't available
+  public static object Get() { IntPtr pv = Value(Toggle); byte b; return pv != IntPtr.Zero && Fn<GetBool>(pv, 18)(pv, out b) == 0 ? (object)(b != 0) : null; }
+  public static void Set(bool on) { Put(Toggle, f => { IntPtr o; return Fn<MakeBool>(f, 17)(f, (byte)(on ? 1 : 0), out o) == 0 ? o : IntPtr.Zero; }); }
+  // 0-100, or -1 when it isn't available
+  public static int GetStrength() { IntPtr pv = Value(Strength); uint u; return pv != IntPtr.Zero && Fn<GetU32>(pv, 12)(pv, out u) == 0 ? (int)Math.Min(100, u) : -1; }
+  // Windows only stores a new strength; the screen picks it up when night light is switched on. So while it is on,
+  // "on" is sent again right after (no flicker): that is what makes the change show at once, like Settings' slider.
+  public static void SetStrength(int x) {
+    uint u = (uint)Math.Max(0, Math.Min(100, x));
+    Put(Strength, f => { IntPtr o; return Fn<MakeU32>(f, 11)(f, u, out o) == 0 ? o : IntPtr.Zero; });
+    object on = Get(); if (on is bool && (bool)on) Set(true);
+  }
+}
+'@
+} catch {}
+function NightState { try { return [NightLight]::Get() } catch { return $null } }
+function SetNight($on) { try { [NightLight]::Set([bool]$on) } catch {} }
+function NightStrength { try { $v = [NightLight]::GetStrength(); if ($v -ge 0) { return $v } } catch {}; return $null }
+$lastN = 'x'
+# the handler loads the real values in the background: it reports defaults (off, 100) for its first moments, so open
+# it now and only start reporting a little later
+$null = NightState; $null = NightStrength; $nightFrom = (Get-Date).AddSeconds(3)
 
 function AirplaneOn {
   try { $r = Await ([Windows.Devices.Radios.Radio]::GetRadiosAsync()) $radioList; return (($r.Count -gt 0) -and -not ($r | Where-Object { $_.State -eq 'On' })) }
@@ -251,7 +343,7 @@ while ($true) {
   } catch { $s = $mgr.GetCurrentSession() }
 
   # every command that came in since the last round (dragging the volume slider sends many: only the last one counts)
-  $quit = $false; $newVol = $null; $newB = $null
+  $quit = $false; $newVol = $null; $newB = $null; $newNs = $null
   while ($cmd.IsCompleted) {
     $line = $cmd.Result
     if ($null -eq $line) { $quit = $true; break }   # parent closed stdin: exit
@@ -259,7 +351,9 @@ while ($true) {
     $line = $line.Trim()
     if ($line -like 'vol *') { $newVol = $line.Substring(4) }
     elseif ($line -like 'bright *') { $newB = $line.Substring(7) }
+    elseif ($line -match '^nightstr (\d+)$') { $newNs = [int]$Matches[1] }
     elseif ($line -match '^radio (WiFi|Bluetooth) (on|off)$') { SetRadio $Matches[1] ($Matches[2] -eq 'on'); $tick = 0; $lastRs = $null }
+    elseif ($line -match '^night (on|off)$') { SetNight ($Matches[1] -eq 'on'); $tick = 0 }
     elseif ($line -eq 'wifiscan') { try { [WlanScanner]::Scan() } catch {} }
     elseif ($line -match '^power (eff|bal|perf)$') { try { [PowerMode]::Set($Matches[1]) } catch {}; $tick = 0 }
     elseif ($line -eq 'mute') { try { [Audio]::Mute = -not [Audio]::Mute } catch {} }
@@ -277,6 +371,7 @@ while ($true) {
   if ($quit) { break }
   if ($null -ne $newVol) { try { [Audio]::Volume = [float]::Parse($newVol, [Globalization.CultureInfo]::InvariantCulture) } catch {} }
   if ($null -ne $newB) { SetBrightness $newB; $tick = 0 }
+  if ($null -ne $newNs) { try { [NightLight]::SetStrength($newNs) } catch {}; $tick = 0 }
 
   # system volume: report whenever it changes (hardware keys, other apps, or our own slider)
   try {
@@ -299,8 +394,10 @@ while ($true) {
     if ($rs -ne $lastRs) { $lastRs = $rs; $p2 = $rs.Split('|'); Emit @{ type = 'radios'; wifi = $(if ($p2[0]) { $p2[0] } else { $null }); bt = $(if ($p2[1]) { $p2[1] } else { $null }) } }
     $b = Brightness
     if ($b -ne $lastB) { $lastB = $b; Emit @{ type = 'bright'; v = $b } }
-    $pm = $null; try { $pm = [PowerMode]::Get() } catch {}
-    if ($pm -ne $lastP) { $lastP = $pm; Emit @{ type = 'power'; mode = $pm } }
+    $pw = $null; try { $pw = [PowerMode]::Get() } catch {}
+    if ($pw -ne $lastP) { $lastP = $pw; Emit @{ type = 'power'; mode = $pw } }
+    $nl = NightState; $ns = NightStrength
+    if ((Get-Date) -ge $nightFrom -and "$nl|$ns" -ne $lastN) { $lastN = "$nl|$ns"; Emit @{ type = 'night'; on = $nl; strength = $ns } }
     if (-not $s) { Emit @{ type = 'state'; active = $false; sessions = $count } }
     else {
       try {

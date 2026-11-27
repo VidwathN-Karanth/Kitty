@@ -54,19 +54,91 @@ function detect(file) {
 }
 
 // ---------- images ----------
-// BMP, ICO, HEIC (and anything else sharp can't read): Windows' own decoders turn it into a PNG first
-async function decodeWithWindows(file) {
-  if (LINUX) throw new Error('This kind of image can\'t be read on Linux')
+// BMP and ICO are read here (sharp can't), on Windows and Linux alike: to RGBA, handed to sharp as raw pixels.
+// Uncompressed BMPs of 1, 4, 8, 16, 24 and 32 bits (with or without colour masks): what cameras, Paint and apps write.
+function readDib(b, o, dataAt, ico) {
+  const hs = b.readUInt32LE(o), w = b.readInt32LE(o + 4), rawH = b.readInt32LE(o + 8), bpp = b.readUInt16LE(o + 14), comp = hs >= 16 ? b.readUInt32LE(o + 16) : 0
+  const h = Math.abs(ico ? rawH / 2 : rawH), topDown = rawH < 0
+  if (comp !== 0 && comp !== 3 && comp !== 6) throw new Error('compressed BMP')
+  let masks = null
+  if (comp === 3 || comp === 6) masks = hs >= 52 ? [b.readUInt32LE(o + 40), b.readUInt32LE(o + 44), b.readUInt32LE(o + 48), hs >= 56 ? b.readUInt32LE(o + 52) : 0] : [b.readUInt32LE(o + hs), b.readUInt32LE(o + hs + 4), b.readUInt32LE(o + hs + 8), 0]
+  else if (bpp === 16) masks = [0x7c00, 0x03e0, 0x001f, 0]
+  const palAt = o + hs + (comp === 3 && hs === 40 ? 12 : 0), colors = bpp <= 8 ? (b.readUInt32LE(o + 32) || 1 << bpp) : 0
+  if (dataAt == null) dataAt = palAt + colors * 4
+  const ch = (v, m) => { if (!m) return 255; let s = 0; while (!((m >>> s) & 1)) s++; const max = m >>> s; return Math.round((((v & m) >>> s) * 255) / max) }
+  const stride = Math.ceil((w * bpp) / 32) * 4, out = Buffer.alloc(w * h * 4)
+  let anyAlpha = false
+  for (let y = 0; y < h; y++) {
+    const row = dataAt + (topDown ? y : h - 1 - y) * stride
+    for (let x = 0; x < w; x++) {
+      const d = (y * w + x) * 4
+      if (bpp <= 8) {
+        const i = (b[row + ((x * bpp) >> 3)] >> (8 - bpp - ((x * bpp) & 7))) & ((1 << bpp) - 1), p = palAt + i * 4
+        out[d] = b[p + 2]; out[d + 1] = b[p + 1]; out[d + 2] = b[p]; out[d + 3] = 255
+      } else if (bpp === 24) { const p = row + x * 3; out[d] = b[p + 2]; out[d + 1] = b[p + 1]; out[d + 2] = b[p]; out[d + 3] = 255 }
+      else {
+        const v = bpp === 16 ? b.readUInt16LE(row + x * 2) : b.readUInt32LE(row + x * 4)
+        if (masks) { out[d] = ch(v, masks[0]); out[d + 1] = ch(v, masks[1]); out[d + 2] = ch(v, masks[2]); out[d + 3] = masks[3] ? ch(v, masks[3]) : 255 }
+        else { out[d] = (v >>> 16) & 255; out[d + 1] = (v >>> 8) & 255; out[d + 2] = v & 255; out[d + 3] = v >>> 24 }
+      }
+      if (out[d + 3]) anyAlpha = true
+    }
+  }
+  // a 32-bit BMP whose alpha is all 0 means "no alpha" (most apps write it that way)
+  if (bpp === 32 && !masks?.[3] && !anyAlpha) for (let d = 3; d < out.length; d += 4) out[d] = 255
+  // icons: 1-bit AND mask after the pixels marks the see-through ones
+  if (ico && bpp < 32) {
+    const mStride = Math.ceil(w / 32) * 4, mAt = dataAt + stride * h
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const m = b[mAt + (h - 1 - y) * mStride + (x >> 3)]
+      if (m !== undefined && (m >> (7 - (x & 7))) & 1) out[(y * w + x) * 4 + 3] = 0
+    }
+  }
+  return { data: out, width: w, height: h }
+}
+const rawImage = ({ data, width, height }) => sharp(data, { raw: { width, height, channels: 4 } }).png().toBuffer()
+function readBmp(file) { const b = fs.readFileSync(file); return rawImage(readDib(b, 14, b.readUInt32LE(10), false)) }
+// an icon holds several sizes: the biggest one, PNG inside as it is, else its bitmap
+function readIco(file) {
+  const b = fs.readFileSync(file), n = b.readUInt16LE(4)
+  let best = null
+  for (let i = 0; i < n; i++) {
+    const e = 6 + i * 16, w = b[e] || 256, size = b.readUInt32LE(e + 8), at = b.readUInt32LE(e + 12)
+    if (!best || w > best.w) best = { w, at, size }
+  }
+  if (!best) throw new Error('empty icon')
+  const img = b.subarray(best.at, best.at + best.size)
+  return img[0] === 0x89 && img[1] === 0x50 ? Promise.resolve(Buffer.from(img)) : rawImage(readDib(img, 0, null, true))
+}
+// HEIC and anything else sharp can't read: Windows' own decoders, or libheif's heif-convert on Linux. Out comes a PNG.
+async function decodeOther(file) {
   const tmp = path.join(os.tmpdir(), `kitty-convert-${process.pid}-${Date.now()}.png`)
   try {
-    await ps(['wic', file, tmp], 60000)
+    if (LINUX) await run(heifConvert(), [file, tmp], 60000)
+    else await ps(['wic', file, tmp], 60000)
     return fs.readFileSync(tmp)
   } catch (e) {
-    throw new Error(/heic|heif/i.test(file) ? 'Windows can\'t read this HEIC photo (install "HEVC Video Extensions" from the Microsoft Store)' : 'Windows couldn\'t read this image')
+    const heic = /heic|heif|hif$/i.test(file)
+    throw new Error(LINUX ? (heic ? 'Reading HEIC photos needs libheif (install the "libheif-examples" package)' : 'This image can\'t be read here')
+      : heic ? 'Windows can\'t read this HEIC photo (install "HEVC Video Extensions" from the Microsoft Store)' : 'Windows couldn\'t read this image')
   } finally { fs.rmSync(tmp, { force: true }) }
 }
+const heifConvert = () => ['/usr/bin/heif-convert', '/usr/local/bin/heif-convert', '/usr/bin/heif-dec'].find((p) => fs.existsSync(p)) ?? 'heif-convert'
+function run(cmd, args, timeout) {
+  return new Promise((ok, fail) => {
+    const p = spawn(cmd, args, { windowsHide: true })
+    const t = setTimeout(() => { p.kill(); fail(new Error('Took too long')) }, timeout)
+    p.on('error', (e) => { clearTimeout(t); fail(e) })
+    p.on('close', (code) => { clearTimeout(t); code === 0 ? ok() : fail(new Error('exit ' + code)) })
+  })
+}
 async function source(file, from) {
-  return ['png', 'jpg', 'webp', 'avif', 'gif', 'tiff', 'svg'].includes(from) ? file : decodeWithWindows(file)
+  if (['png', 'jpg', 'webp', 'avif', 'gif', 'tiff', 'svg'].includes(from)) return file
+  if (from === 'bmp' || from === 'ico') {
+    try { return await (from === 'bmp' ? readBmp(file) : readIco(file)) }
+    catch (e) { if (LINUX) throw new Error(`This ${from.toUpperCase()} can't be read (${e.message})`) } // Windows: its own decoder has a go
+  }
+  return decodeOther(file)
 }
 // 24-bit BMP (the kind every app opens), bottom-up rows padded to 4 bytes
 function bmp(rgb, w, h) {

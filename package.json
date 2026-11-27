@@ -1,7 +1,7 @@
 {
   "name": "kitty",
   "productName": "Kitty",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "private": true,
   "main": "main.js",
   "scripts": {
@@ -9,7 +9,8 @@
     "build": "vite build",
     "dist": "vite build && electron-builder --win nsis --publish never",
     "release": "vite build && electron-builder --win nsis --publish always",
-    "dist:linux": "electron-builder --linux AppImage --publish never"
+    "dist:linux": "vite build && electron-builder --linux AppImage --publish never",
+    "release:linux": "vite build && electron-builder --linux AppImage --publish always"
   },
   "dependencies": {
     "@fontsource/cascadia-mono": "^5.3.0",

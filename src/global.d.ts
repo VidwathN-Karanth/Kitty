@@ -77,6 +77,8 @@ interface Window {
     openUrl(url: string): void
     wifiList(scan?: boolean): Promise<{ current: string | null; nets: WifiNet[]; error?: string; fix?: string }>
     wifiJoin(ssid: string, password: string | null, secure: boolean): Promise<{ ok?: boolean; needPassword?: boolean; error?: string }>
+    canPanels(): Promise<boolean>
+    openPanel(name: 'display' | 'sound' | 'bluetooth' | 'nightlight'): void
     convert(): Promise<ConvertState>
     onConvert(cb: (s: ConvertState) => void): () => void
     convertPick(): Promise<void>

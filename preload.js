@@ -34,6 +34,7 @@ contextBridge.exposeInMainWorld('kitty', {
   // updates, info, misc
   updateStatus: call('update:get'), onUpdate: on('update'), checkUpdate: send('update:check'), installUpdate: send('update:install'),
   info: call('info:get'), onInfo: on('info'), openUrl: send('open:url'),
+  canPanels: call('panel:can'), openPanel: send('panel:open'),
   // Convert
   convert: call('convert:get'), onConvert: on('convert'), convertPick: call('convert:pick'), convertAdd: send('convert:add'), convertRemove: send('convert:remove'),
   convertClear: send('convert:clear'), convertSet: send('convert:set'), convertRun: send('convert:run'), convertOpen: send('convert:open'), convertReveal: send('convert:reveal'),

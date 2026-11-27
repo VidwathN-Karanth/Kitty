@@ -213,6 +213,23 @@ ipcMain.on('convert:run', () => convert.run())
 ipcMain.on('convert:open', (_e, p) => { if (convert.isOutput(p)) shell.openPath(p) })
 ipcMain.on('convert:reveal', (_e, p) => { if (convert.isOutput(p)) shell.showItemInFolder(p) })
 
+// System settings pages (the Control Center's shortcuts): Windows Settings, or GNOME / KDE settings on Linux
+const PANELS = { display: ['ms-settings:display', 'display', 'kcm_kscreen'], sound: ['ms-settings:sound', 'sound', 'kcm_pulseaudio'], bluetooth: ['ms-settings:bluetooth', 'bluetooth', 'kcm_bluetooth'], nightlight: ['ms-settings:nightlight', 'display', 'kcm_nightlight'] }
+const linuxSettingsApp = () => {
+  const gnome = ['/usr/bin/gnome-control-center', '/usr/local/bin/gnome-control-center'].find((p) => fs.existsSync(p))
+  if (gnome) return { cmd: gnome, kde: false }
+  const kde = ['/usr/bin/systemsettings', '/usr/bin/systemsettings5'].find((p) => fs.existsSync(p))
+  return kde ? { cmd: kde, kde: true } : null
+}
+ipcMain.handle('panel:can', () => !LINUX || !!linuxSettingsApp())
+ipcMain.on('panel:open', (_e, name) => {
+  const p = PANELS[name]
+  if (!p) return
+  if (!LINUX) return shell.openExternal(p[0])
+  const a = linuxSettingsApp()
+  if (a) spawn(a.cmd, [a.kde ? p[2] : p[1]], { detached: true, stdio: 'ignore' }).unref()
+})
+
 ipcMain.handle('wifi:list', (_e, scan) => { if (scan) helper?.stdin.write('wifiscan\n'); return wifi.list() }) // the scan's results show on the next list
 ipcMain.handle('wifi:join', (_e, { ssid, password, secure }) => wifi.join(ssid, password, secure))
 

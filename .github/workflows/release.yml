@@ -1,6 +1,6 @@
 name: release
-# Push a tag like v0.1.0 and this builds the Windows installer and publishes it to GitHub Releases.
-# Installed copies of Kitty pick it up automatically (electron-updater reads latest.yml from the release).
+# Push a tag like v0.1.0 and this builds the Windows installer and the Linux AppImage and publishes both to GitHub
+# Releases. Installed copies of Kitty pick it up automatically (electron-updater reads latest.yml / latest-linux.yml).
 on:
   push:
     tags: ['v*']
@@ -16,5 +16,18 @@ jobs:
           node-version: 22
       - run: npm ci
       - run: npm run release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  linux:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm run release:linux
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

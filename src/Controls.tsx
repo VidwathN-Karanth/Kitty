@@ -107,7 +107,7 @@ function Networks({ back }: { back: () => void }) {
 }
 
 // Night light: on/off and its strength (0-100, the same Strength as in Windows Settings)
-function NightPanel({ on, strength, back, toggle }: { on: boolean; strength: number | null; back: () => void; toggle: () => void }) {
+function NightPanel({ on, strength, back, toggle, panels }: { on: boolean; strength: number | null; back: () => void; toggle: () => void; panels: boolean }) {
   const [shown, setShown] = useState(strength ?? 50) // follows the bar while dragging, then the PC's own value
   useEffect(() => { if (strength != null) setShown(strength) }, [strength])
   return (
@@ -123,7 +123,7 @@ function NightPanel({ on, strength, back, toggle }: { on: boolean; strength: num
           : <small className="np-note">The strength can't be changed from here on this PC.</small>}
         <div className="np-scale"><span>Less warm</span><span>{on ? '' : 'Turn it on to see the change'}</span><span>Warmer</span></div>
       </div>
-      {WIN && <button className="np-link" onClick={() => window.kitty.openUrl('ms-settings:nightlight')}>Schedule and more in Windows Settings<ArrowUpRight size={13} /></button>}
+      {panels && <button className="np-link" onClick={() => window.kitty.openPanel('nightlight')}>Schedule and more in {WIN ? 'Windows Settings' : 'Settings'}<ArrowUpRight size={13} /></button>}
     </div>
   )
 }
@@ -134,6 +134,9 @@ export default function Controls({ media }: { media: Media }) {
   const [page, setPage] = useState<'main' | 'wifi' | 'night'>('main')
   const [pend, setPend] = useState<{ wifi?: boolean; bt?: boolean; power?: PowerMode; night?: boolean }>({}) // shown right away, until the PC reports back
   const [ssid, setSsid] = useState<string | null>(null)
+  // shortcuts into the system's settings: Windows Settings, or GNOME / KDE settings when one is installed
+  const [panels, setPanels] = useState(WIN)
+  useEffect(() => { window.kitty.canPanels().then(setPanels).catch(() => {}) }, [])
   const r = media.radios
   useEffect(() => setPend({}), [r?.wifi, r?.bt, media.power, media.night])
   useEffect(() => { window.kitty.wifiList().then((x) => setSsid(x.current)).catch(() => {}) }, [r?.wifi])
@@ -152,27 +155,27 @@ export default function Controls({ media }: { media: Media }) {
 
   const toggleNight = () => { const on = !night; setPend((p) => ({ ...p, night: on })); later('night'); window.kitty.mediaCmd(`night ${on ? 'on' : 'off'}`) }
   if (page === 'wifi') return <Networks back={() => setPage('main')} />
-  if (page === 'night') return <NightPanel on={!!night} strength={media.nightStrength ?? null} back={() => setPage('main')} toggle={toggleNight} />
+  if (page === 'night') return <NightPanel on={!!night} strength={media.nightStrength ?? null} back={() => setPage('main')} toggle={toggleNight} panels={panels} />
   return (
     <div className="qs" style={{ gridTemplateColumns: hasBright ? '62px 62px 1fr' : '62px 1fr' }}>
       {hasBright && <VSlider label="Brightness" value={media.bright! / 100} onChange={(x) => window.kitty.mediaCmd(`bright ${Math.max(1, Math.round(x * 100))}`)} icon={<Sun size={18} />} />}
       <VSlider label="Volume" value={media.vol?.v ?? 0} onChange={(x) => window.kitty.mediaCmd(`vol ${x.toFixed(3)}`)} icon={muted ? <VolumeX size={18} /> : <Volume2 size={18} />} />
-      <div className="qs-grid" style={{ gridTemplateRows: [(WIN || hasNight) && '1fr', '1fr', power && 'auto'].filter(Boolean).join(' ') }}>
+      <div className="qs-grid" style={{ gridTemplateRows: [(panels || hasNight) && '1fr', '1fr', power && 'auto'].filter(Boolean).join(' ') }}>
         <Tile on={wifiOn} color="#4f9dff" icon={wifiOn ? <Wifi size={16} /> : <WifiOff size={16} />} title="Wi-Fi"
           sub={!r?.wifi ? 'Not found' : !wifiOn ? 'Off' : r.wifi === 'connected' ? ssid ?? 'Connected' : 'Not connected'}
           onClick={() => r?.wifi && radio('wifi', !wifiOn)} more={r?.wifi ? () => setPage('wifi') : undefined} />
         <Tile on={btOn} color="#4f9dff" icon={btOn ? <Bluetooth size={16} /> : <BluetoothOff size={16} />} title="Bluetooth"
           sub={!r?.bt ? 'Not found' : btOn ? 'On' : 'Off'} onClick={() => r?.bt && radio('bt', !btOn)}
-          more={WIN ? () => window.kitty.openUrl('ms-settings:bluetooth') : undefined} />
+          more={panels ? () => window.kitty.openPanel('bluetooth') : undefined} />
         <Tile on={muted} color="#ff5a4a" icon={muted ? <VolumeX size={16} /> : <Volume2 size={16} />} title="Mute" sub={muted ? 'Muted' : 'Sound on'} onClick={() => window.kitty.mediaCmd('mute')} />
         {hasNight
           ? <Tile on={!!night} color="#f0b44a" icon={<Moon size={16} />} title="Night light"
               sub={(night ? 'On' : 'Off') + (media.nightStrength != null ? ` · ${media.nightStrength}%` : '')}
               onClick={toggleNight} more={() => setPage('night')} />
-          : WIN && <Tile link color="#f0b44a" icon={<Moon size={16} />} title="Night light" sub="Settings" onClick={() => window.kitty.openUrl('ms-settings:nightlight')} />}
-        {WIN && <>
-          <Tile link color="#b79bff" icon={<MonitorCog size={16} />} title="Display" sub="Settings" onClick={() => window.kitty.openUrl('ms-settings:display')} />
-          <Tile link color="#6fd0a0" icon={<Speaker size={16} />} title="Sound" sub="Output" onClick={() => window.kitty.openUrl('ms-settings:sound')} />
+          : panels && <Tile link color="#f0b44a" icon={<Moon size={16} />} title="Night light" sub="Settings" onClick={() => window.kitty.openPanel('nightlight')} />}
+        {panels && <>
+          <Tile link color="#b79bff" icon={<MonitorCog size={16} />} title="Display" sub="Settings" onClick={() => window.kitty.openPanel('display')} />
+          <Tile link color="#6fd0a0" icon={<Speaker size={16} />} title="Sound" sub="Output" onClick={() => window.kitty.openPanel('sound')} />
         </>}
         {power && (
           <div className="qs-seg" role="radiogroup" aria-label="Power mode">

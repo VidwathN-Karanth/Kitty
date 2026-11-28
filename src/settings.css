@@ -151,3 +151,7 @@ body.sw-body { background: #0d0f12; overflow: hidden; }
 .sw select.pick:focus-visible { border-color: var(--lime); }
 .sw select.pick option { background: var(--ctl); color: var(--text); }
 .sw .group + .cards2 { margin-top: 16px; }
+
+/* Linux setup: the install command, copyable */
+.sw code.cmd { display: block; font-family: 'Cascadia Mono', Consolas, monospace; font-size: 13px; padding: 12px 14px; border-radius: 12px; background: var(--ctl); border: 1px solid var(--line); white-space: pre-wrap; word-break: break-all; user-select: all; }
+.sw .row .ctl { display: flex; gap: 8px; align-items: center; }

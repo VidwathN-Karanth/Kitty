@@ -37,6 +37,8 @@ contextBridge.exposeInMainWorld('kitty', {
   updateStatus: call('update:get'), onUpdate: on('update'), checkUpdate: send('update:check'), installUpdate: send('update:install'),
   info: call('info:get'), onInfo: on('info'), openUrl: send('open:url'),
   canPanels: call('panel:can'), openPanel: send('panel:open'),
+  // Linux: tools Kitty uses
+  linuxTools: call('linux:tools'), linuxInstall: call('linux:install'),
   // Download
   dl: call('dl:get'), onDl: on('dl'), dlSite: call('dl:site'), dlSetup: send('dl:setup'), dlStart: (url, kind) => ipcRenderer.send('dl:start', { url, kind }),
   dlCancel: send('dl:cancel'), dlClear: send('dl:clear'), dlOpen: send('dl:open'), dlReveal: send('dl:reveal'), clipText: call('clips:text'),

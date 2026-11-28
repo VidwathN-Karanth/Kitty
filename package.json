@@ -1,7 +1,7 @@
 {
   "name": "kitty",
   "productName": "Kitty",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "private": true,
   "main": "main.js",
   "scripts": {
@@ -61,7 +61,8 @@
       "convert.js",
       "convert.ps1",
       "phone.js",
-      "downloader.js"
+      "downloader.js",
+      "linux-tools.js"
     ],
     "asarUnpack": [
       "bt.ps1",

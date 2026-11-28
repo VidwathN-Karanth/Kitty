@@ -1,7 +1,7 @@
 import { ReactNode, useEffect, useMemo, useState } from 'react'
 import {
   Home, Plug, MessageCircle, LayoutGrid, SlidersHorizontal, Cat as CatIcon, Shirt, Newspaper, Lock, Check, Search, Sun, Moon, Music, Timer,
-  Inbox, Copy, FileText, Clock, Settings as Gear, Sparkles, Bot, ChevronRight, Play, Globe, ArrowLeftRight, Download,
+  Inbox, Copy, FileText, Clock, Settings as Gear, Sparkles, Bot, ChevronRight, Play, Globe, ArrowLeftRight, Download, Wrench, Terminal, RefreshCw, CircleCheck, CircleX,
 } from 'lucide-react'
 import { TABS } from './tabs'
 import Cat, { EMOTIONS, Mood } from './Cat'
@@ -32,7 +32,9 @@ const PAGES = [
   { id: 'wardrobe', label: 'Wardrobe', icon: Shirt, group: 1 },
   { id: 'general', label: 'General', icon: SlidersHorizontal, group: 2 },
   { id: 'news', label: 'News', icon: Newspaper, group: 2 },
+  { id: 'linux', label: 'Linux setup', icon: Wrench, group: 2 },
 ] as const
+const ON_LINUX = navigator.userAgent.includes('Linux')
 type PageId = (typeof PAGES)[number]['id']
 
 const SUB: Record<PageId, string> = {
@@ -44,6 +46,7 @@ const SUB: Record<PageId, string> = {
   wardrobe: 'Pick what Kitty wears. Kitty tries it on right away.',
   general: 'Notifications, animations, shortcuts and the island',
   news: "What's new in Kitty",
+  linux: 'The Linux tools Kitty uses, and installing the missing ones',
 }
 
 const APPS: { id: keyof Settings['apps']; title: string; desc: string; icon: typeof Home; tone: string }[] = [
@@ -118,6 +121,50 @@ function ShortcutBox({ value, failed, onSet }: { value: string; failed: boolean;
 }
 
 const SHORTCUTS: [ShortcutKey, string][] = [['open', 'Open the island'], ['home', 'Home'], ['music', 'Music'], ['claude', 'Claude Code'], ['focus', 'Focus timer'], ['clipboard', 'Clipboard'], ['note', 'Note']]
+
+// Linux: every desktop tool Kitty uses, whether it is there, and one button that installs the missing ones in a
+// terminal (the password is typed there). It looks again every few seconds, so ticks appear as installs finish.
+function LinuxSetup() {
+  const [st, setSt] = useState<LinuxTools | null>(null)
+  const [res, setRes] = useState<{ ok?: boolean; terminal?: string; command?: string; error?: string } | null>(null)
+  const [copied, setCopied] = useState(false)
+  useEffect(() => { const look = () => window.kitty.linuxTools().then(setSt); look(); const t = setInterval(look, 4000); return () => clearInterval(t) }, [])
+  if (!st) return <p className="lead">Looking at this PC…</p>
+  const missing = st.tools.filter((t) => !t.ok)
+  const session = st.session === 'wayland' ? 'Wayland (Kitty runs through XWayland so it can stay on top)' : st.session || 'unknown session'
+  return (
+    <>
+      <p className="lead">Kitty uses a few common Linux tools. A missing one only switches off the feature that needs it. {st.desktop || 'Desktop'} · {session}.</p>
+      <Group>
+        {st.tools.map((t) => (
+          <Row key={t.id} title={t.what} desc={t.pkg ? `Package: ${t.pkg}` : 'Not packaged for this system'} id={t.id}>
+            {t.ok ? <span className="badge good"><CircleCheck size={14} style={{ verticalAlign: '-2px' }} /> Installed</span> : <span className="badge warn"><CircleX size={14} style={{ verticalAlign: '-2px' }} /> Missing</span>}
+          </Row>
+        ))}
+      </Group>
+      <h3>Install</h3>
+      <Group>
+        <Row title={missing.length ? `${missing.length} missing` : 'Everything is installed'}
+          desc={!st.manager ? "Kitty doesn't know this system's package manager: install the packages above with yours."
+            : missing.length ? 'Opens a terminal that shows the command, asks for your password and installs them.' : 'Nothing to do.'}>
+          <button className="btn" onClick={() => window.kitty.linuxTools().then(setSt)}><RefreshCw size={14} style={{ verticalAlign: '-2px' }} /> Check again</button>
+          {missing.length > 0 && st.manager && <button className="btn lime" onClick={() => window.kitty.linuxInstall(missing.map((t) => t.id)).then(setRes)}><Terminal size={14} style={{ verticalAlign: '-2px' }} /> Install {missing.length} in a terminal</button>}
+        </Row>
+        {res && (
+          <Row title={res.ok ? `Opened in ${res.terminal}` : res.error ?? "Couldn't open a terminal"} desc={res.ok ? 'Type your password there. The ticks above update when it is done.' : 'Copy this into a terminal:'}>
+            {res.command && <button className="btn" onClick={() => { navigator.clipboard.writeText(res.command!); setCopied(true); setTimeout(() => setCopied(false), 1500) }}>{copied ? 'Copied' : 'Copy command'}</button>}
+          </Row>
+        )}
+        {res?.command && <div className="row col"><code className="cmd">{res.command}</code></div>}
+      </Group>
+      <h3>Good to know</h3>
+      <Group>
+        <Row title="Global shortcuts" desc="Through XWayland, Kitty's shortcuts (like Ctrl+Alt+T) work while an X11 app or Kitty itself is in front. In GNOME you can also set a custom shortcut that runs Kitty." />
+        <Row title="Tray icon" desc="GNOME shows Kitty's tray icon (Pause, Settings, Quit) only with the AppIndicator extension, listed above when it is needed." />
+      </Group>
+    </>
+  )
+}
 
 export default function SettingsApp() {
   const [page, setPage] = useState<PageId>(() => { const p = new URLSearchParams(location.search).get('settings') as PageId; return PAGES.some((x) => x.id === p) ? p : 'home' })
@@ -196,7 +243,7 @@ export default function SettingsApp() {
         {[0, 1, 2].map((g) => (
           <div className="ngroup" key={g}>
             {g > 0 && <small>{g === 1 ? s.name : 'Settings'}</small>}
-            {PAGES.filter((p) => p.group === g).map((p) => (
+            {PAGES.filter((p) => p.group === g && (p.id !== 'linux' || ON_LINUX)).map((p) => (
               <button key={p.id} className={p.id === page ? 'on' : ''} onClick={() => setPage(p.id)}><p.icon size={18} />{p.label}</button>
             ))}
           </div>
@@ -479,6 +526,8 @@ export default function SettingsApp() {
             </Group>
           </>
         )}
+
+        {page === 'linux' && <LinuxSetup />}
 
         {page === 'news' && NEWS.map((n) => (
           <Group key={n.v} title={`Kitty ${n.v} · ${n.d}`}>

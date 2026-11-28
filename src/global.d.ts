@@ -29,6 +29,7 @@ type ConvertResult = { status: 'waiting' | 'working' | 'done' | 'error' | 'skip'
 type ConvertState = { files: ConvertFile[]; from: string; to: string | null; combine: boolean; running: boolean; results: Record<string, ConvertResult>; toOptions: string[]; detected: string | null; mixed: boolean }
 type DlJob = { id: string; url: string; site: 'youtube' | 'instagram'; kind: 'video' | 'audio'; status: 'working' | 'done' | 'error' | 'cancelled'; pct: number; speed: string; eta: string; title: string; out?: string; error?: string }
 type DlState = { tools: { ytdlp: boolean; ffmpeg: boolean }; size: { ytdlp: number; ffmpeg: number }; setup: null | { step: 'yt-dlp' | 'ffmpeg' | 'unpacking' | 'error'; pct?: number; error?: string }; jobs: DlJob[] }
+type LinuxTools = { manager: string | null; desktop: string; session: string; tools: { id: string; what: string; ok: boolean; pkg: string | null }[] }
 type PhoneStatus = { state: 'sending' | 'done'; count?: number; ok?: boolean; device?: string; sent?: number; error?: string }
 type Clip = { t: number; text?: string; image?: string; thumb?: string; w?: number; h?: number }
 type SysStats = { cpu: number | null; ram: number | null; ramUsed: number; ramTotal: number; gpu: number | null }
@@ -93,6 +94,8 @@ interface Window {
     dlOpen(path: string): void
     dlReveal(path: string): void
     clipText(): Promise<string>
+    linuxTools(): Promise<LinuxTools | null>
+    linuxInstall(ids: string[]): Promise<{ ok?: boolean; terminal?: string; command?: string; error?: string } | null>
     phoneDevices(): Promise<{ id: string; name: string }[] | null>
     phoneSend(paths: string[]): void
     onPhoneStatus(cb: (s: PhoneStatus) => void): () => void

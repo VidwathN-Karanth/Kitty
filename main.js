@@ -12,6 +12,7 @@ const wifi = require('./wifi')
 const convert = require('./convert')
 const phone = require('./phone')
 const downloader = require('./downloader')
+const linuxTools = require('./linux-tools')
 
 const LINUX = process.platform === 'linux'
 // Linux: run on X11 (through XWayland on Wayland desktops). Native Wayland doesn't let an app stay on top, sit at the
@@ -68,7 +69,7 @@ function create() {
     webPreferences: { preload: path.join(__dirname, 'preload.js') },
   })
   win.setAlwaysOnTop(true, 'screen-saver')
-  win.setIgnoreMouseEvents(true, { forward: true })
+  if (!LINUX) win.setIgnoreMouseEvents(true, { forward: true }) // Linux: the window is shaped to the island instead (see 'rect')
   // Other "always on top" windows (fullscreen apps, players, popups) can still land above the island. Take the top
   // spot back right away when that happens, and check again every second (moveTop never steals the keyboard focus).
   const home = { width: W, height: H, x: Math.round(x + (width - W) / 2), y: 0 }
@@ -219,6 +220,10 @@ ipcMain.on('dl:open', (_e, p) => { if (downloader.isOutput(p)) shell.openPath(p)
 ipcMain.on('dl:reveal', (_e, p) => { if (downloader.isOutput(p)) shell.showItemInFolder(p) })
 ipcMain.handle('clips:text', () => clipboard.readText()) // the Download page offers a link that was just copied
 
+// ---------- Linux: the desktop tools Kitty uses, and installing missing ones in a terminal (linux-tools.js) ----------
+ipcMain.handle('linux:tools', () => (LINUX ? linuxTools.status() : null))
+ipcMain.handle('linux:install', (_e, ids) => (LINUX && Array.isArray(ids) ? linuxTools.install(ids.filter((i) => typeof i === 'string')) : null))
+
 // ---------- Send to phone (KDE Connect, phone.js) ----------
 ipcMain.handle('phone:devices', () => phone.devices())
 ipcMain.on('phone:send', async (_e, paths) => {
@@ -285,7 +290,17 @@ ipcMain.on('quit', () => app.quit())
 // The window is mostly transparent. Click-through is decided here from the real cursor position vs the
 // island's rectangle (reported by the renderer), because mouse events don't arrive while dragging files in.
 let rect = { x: 0, y: 0, w: 0, h: 0 }, ignoring = true
-ipcMain.on('rect', (_e, r) => { rect = r })
+// Linux: X11 has no "click-through but tell me where the mouse is", and under XWayland Kitty only hears about the
+// mouse while it is over one of its own windows. So the window takes the shape of the island (plus room for its
+// shadow): the mouse reaches the island directly, everything around it goes to the windows below.
+let shapeKey = ''
+ipcMain.on('rect', (_e, r) => {
+  rect = r
+  if (!LINUX || !win || win.isDestroyed()) return
+  const m = 36, s = { x: Math.max(0, Math.floor(r.x - m)), y: 0, width: Math.ceil(r.w + 2 * m), height: Math.ceil(r.y + r.h + m) }
+  const key = `${s.x},${s.width},${s.height}`
+  if (key !== shapeKey) { shapeKey = key; win.setShape([s]) }
+})
 
 let tracking = true, last = ''
 function poll() {
@@ -294,7 +309,7 @@ function poll() {
     const p = screen.getCursorScreenPoint(), b = win.getBounds()
     const x = p.x - b.x, y = p.y - b.y
     const inside = !dragHidden && x >= rect.x - 4 && x <= rect.x + rect.w + 4 && y >= rect.y && y <= rect.y + rect.h + 4
-    if (inside === ignoring) { ignoring = !inside; win.setIgnoreMouseEvents(ignoring, { forward: true }) }
+    if (!LINUX && inside === ignoring) { ignoring = !inside; win.setIgnoreMouseEvents(ignoring, { forward: true }) }
     const key = p.x + ',' + p.y
     still = key === last
     last = key

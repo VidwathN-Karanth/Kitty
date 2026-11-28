@@ -1,4 +1,4 @@
-import { Home, Music, MessageCircle, Timer, Inbox, Copy, FileText, SlidersHorizontal, Globe, ArrowLeftRight } from 'lucide-react'
+import { Home, Music, MessageCircle, Timer, Inbox, Copy, FileText, SlidersHorizontal, Globe, ArrowLeftRight, Download } from 'lucide-react'
 import ClaudeMark from './ClaudeMark'
 
 // title = [white part, coloured part] shown top-left, like "Claude Code" / "Music Player"
@@ -14,6 +14,7 @@ export const TABS = [
   { id: 'focus', label: 'Focus', icon: Timer, color: '#b36ee8', title: ['Focus ', 'Timer'] },
   { id: 'note', label: 'Note', icon: FileText, color: '#f0d442', title: ['Note', 'pad'] },
   { id: 'convert', label: 'Convert', icon: ArrowLeftRight, color: '#4fd1c5', title: ['File ', 'Convert'] },
+  { id: 'download', label: 'Download', icon: Download, color: '#ff5c7a', title: ['Video ', 'Download'] },
 ] as const
 
 export type TabId = (typeof TABS)[number]['id']

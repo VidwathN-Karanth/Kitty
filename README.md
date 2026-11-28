@@ -16,9 +16,23 @@ Download the latest version from [Releases](https://github.com/VidwathN-Karanth/
 chmod +x Kitty-*.AppImage && ./Kitty-*.AppImage
 ```
 
-Kitty reads music, volume and radios from the usual desktop tools. Most desktops already have them; if music or volume
-doesn't show, install them (Ubuntu/Debian: `sudo apt install playerctl pipewire-bin network-manager rfkill upower`).
-On Wayland desktops Kitty runs through XWayland so it can stay on top.
+If it doesn't start, install FUSE (Ubuntu 22.04: `sudo apt install libfuse2`, 24.04 and newer: `libfuse2t64`).
+On Wayland desktops Kitty runs through XWayland (it restarts itself once for that) so it can sit at the top and stay
+on top.
+
+Kitty reads music, volume, radios and more from the usual desktop tools. Most desktops have them already; if a
+feature doesn't show, install what it needs (Ubuntu/Debian names):
+
+| Feature | Package |
+|---|---|
+| Music, volume, mic dot | `playerctl pipewire-bin` |
+| Wi-Fi list and joining, airplane mode | `network-manager rfkill` |
+| Bluetooth battery levels | `upower` |
+| Brightness, power mode | `brightnessctl power-profiles-daemon` |
+| Night light and its strength | GNOME |
+| Send to phone | `kdeconnect` (phone paired in KDE Connect) |
+| Convert: Word and PDF / HEIC photos | `libreoffice` / `libheif-examples` |
+| Download: video with sound, MP3 | `ffmpeg` (or Kitty fetches it) |
 
 ## Updates
 

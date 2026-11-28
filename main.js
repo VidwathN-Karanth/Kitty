@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, globalShortcut, screen, clipboard, shell, powerMonitor, Tray, Menu, nativeImage, net, dialog } = require('electron')
+const { app, BrowserWindow, ipcMain, globalShortcut, screen, clipboard, shell, powerMonitor, Tray, Menu, nativeImage, net, dialog, ClipboardItem } = require('electron')
 const path = require('path')
 const fs = require('fs')
 const { spawn, execFile } = require('child_process')
@@ -10,12 +10,23 @@ const info = require('./info')
 const usage = require('./usage')
 const wifi = require('./wifi')
 const convert = require('./convert')
+const phone = require('./phone')
+const downloader = require('./downloader')
 
 const LINUX = process.platform === 'linux'
 // Linux: run on X11 (through XWayland on Wayland desktops). Native Wayland doesn't let an app stay on top, sit at the
 // top edge of the screen or know where the cursor is, which the island needs. Starting Kitty with
 // --ozone-platform=wayland (for a desktop without XWayland) is respected.
 if (LINUX && !app.commandLine.hasSwitch('ozone-platform')) app.commandLine.appendSwitch('ozone-platform', 'x11')
+// Newer Electron picks Wayland before this file runs, so the switch above comes too late there: the island would be a
+// Wayland window, which the desktop places in the middle of the screen. On a Wayland desktop that has XWayland, Kitty
+// starts itself again once with the switch on its real command line (an AppImage restarts the AppImage file itself,
+// its mounted copy goes away with this process). KITTY_X11 stops it from doing that twice.
+if (LINUX && process.env.WAYLAND_DISPLAY && process.env.DISPLAY && !process.env.KITTY_X11 && !process.argv.some((a) => a.startsWith('--ozone-platform'))) {
+  process.env.KITTY_X11 = '1'
+  app.relaunch({ execPath: process.env.APPIMAGE || process.execPath, args: [...process.argv.slice(1), '--ozone-platform=x11'] })
+  app.exit(0)
+}
 
 // dev only: lets automated checks drive the windows over the DevTools protocol
 if (!app.isPackaged) app.commandLine.appendSwitch('remote-debugging-port', '9333')
@@ -68,6 +79,8 @@ function create() {
     if (b.x !== home.x || b.y !== home.y || b.width !== home.width || b.height !== home.height) win.setBounds(home) // put back if moved or resized
   }
   win.on('always-on-top-changed', (_e, on) => { if (!on) top() })
+  // Linux desktops may centre a new window (Ubuntu's "centre new windows"): once it is up, put it at the top again
+  if (LINUX) for (const ms of [60, 400, 1200, 3000]) setTimeout(() => { if (win && !win.isDestroyed()) { win.setBounds(home); win.setAlwaysOnTop(true, 'screen-saver') } }, ms)
   win.on('blur', top)
   setInterval(top, 1000)
   if (!app.isPackaged) {
@@ -194,6 +207,26 @@ ipcMain.handle('site:info', async (_e, u) => {
 })
 
 // ---------- Control Center: Wi-Fi networks (the radios, brightness and power mode go through the media helper) ----------
+// ---------- Download: YouTube / Instagram (downloader.js) ----------
+downloader.start((s) => win?.webContents.send('dl', s))
+ipcMain.handle('dl:get', () => downloader.get())
+ipcMain.handle('dl:site', (_e, u) => downloader.site(u))
+ipcMain.on('dl:setup', () => downloader.setup())
+ipcMain.on('dl:start', (_e, { url, kind }) => downloader.download(url, kind))
+ipcMain.on('dl:cancel', (_e, id) => downloader.cancel(id))
+ipcMain.on('dl:clear', () => downloader.clear())
+ipcMain.on('dl:open', (_e, p) => { if (downloader.isOutput(p)) shell.openPath(p) })
+ipcMain.on('dl:reveal', (_e, p) => { if (downloader.isOutput(p)) shell.showItemInFolder(p) })
+ipcMain.handle('clips:text', () => clipboard.readText()) // the Download page offers a link that was just copied
+
+// ---------- Send to phone (KDE Connect, phone.js) ----------
+ipcMain.handle('phone:devices', () => phone.devices())
+ipcMain.on('phone:send', async (_e, paths) => {
+  const files = [].concat(paths)
+  all('phone:status', { state: 'sending', count: files.length })
+  all('phone:status', { state: 'done', ...(await phone.send(files)) })
+})
+
 // ---------- Convert: images, PDF, Word (convert.js). The job lives there, so it carries on while the island is closed ----------
 convert.start((s) => win?.webContents.send('convert', s))
 ipcMain.handle('convert:get', () => convert.get())
@@ -272,8 +305,38 @@ function poll() {
 ipcMain.on('track', (_e, on) => { tracking = on })
 
 // ---------- clipboard ----------
+// Text and images (a screenshot lands on the clipboard): the history keeps both. A new image is saved as a PNG in
+// Kitty's own folder (the last few only, cleared at start) so it can be dragged into any app or sent to the phone,
+// and the island opens to show it.
 let clips = []
+const clipDir = () => path.join(app.getPath('userData'), 'clip-images')
+let clipChanged = true // Windows: the helper says when anything was copied; Linux has no such signal, so it always looks
+let lastImage = ''
+async function checkImage() {
+  // Electron 45's clipboard is the web one: has() / read() items / getType() blobs
+  if (!(await clipboard.has('image/png'))) return
+  const item = (await clipboard.read()).find((i) => i.types.includes('image/png'))
+  if (!item) return
+  const img = nativeImage.createFromBuffer(Buffer.from(await (await item.getType('image/png')).arrayBuffer()))
+  if (img.isEmpty()) return
+  const { width, height } = img.getSize()
+  const print = width + 'x' + height + ':' + img.resize({ width: 24, height: 24, quality: 'good' }).toBitmap().toString('base64') // same picture, same print
+  if (print === lastImage) return
+  lastImage = print
+  const same = clips.find((c) => c.print === print) // copied again: it just moves to the top
+  if (same) { clips = [same, ...clips.filter((c) => c !== same)]; win?.webContents.send('clips', clips); return }
+  fs.mkdirSync(clipDir(), { recursive: true })
+  const t = Date.now(), file = path.join(clipDir(), `Clipboard image ${new Date(t).toISOString().slice(0, 19).replace(/[T:]/g, (c) => (c === 'T' ? ' ' : '.'))}.png`)
+  fs.writeFileSync(file, img.toPNG())
+  const thumb = img.resize(width > height ? { width: Math.min(width, 360) } : { height: Math.min(height, 240) }, { quality: 'good' }).toDataURL()
+  const old = clips.filter((c) => c.image).slice(7) // keep the last 8 images
+  for (const c of old) fs.rmSync(c.image, { force: true })
+  clips = [{ image: file, thumb, w: width, h: height, print, t }, ...clips.filter((c) => !old.includes(c))].slice(0, 20)
+  win?.webContents.send('clips', clips)
+  if (!paused) win?.webContents.send('clip:image', clips[0])
+}
 function watchClipboard() {
+  try { fs.rmSync(clipDir(), { recursive: true, force: true }) } catch {}
   // Electron 45 made the clipboard calls asynchronous, so everything here is awaited
   let busy = false
   setInterval(async () => {
@@ -284,17 +347,22 @@ function watchClipboard() {
       let skip = false
       try { skip = !!(await clipboard.has('ExcludeClipboardContentFromMonitorProcessing')) } catch {}
       if (skip) return
+      if (clipChanged || LINUX) { clipChanged = false; await checkImage() }
       const text = await clipboard.readText()
-      if (typeof text === 'string' && text && text !== clips[0]?.text) {
+      if (typeof text === 'string' && text && text !== clips.find((c) => c.text)?.text) {
         clips = [{ text, t: Date.now() }, ...clips.filter((c) => c.text !== text)].slice(0, 20)
         win?.webContents.send('clips', clips)
       }
     } catch (e) { console.log('[clipboard]', e.message) } finally { busy = false }
-  }, 1000)
+  }, 700)
 }
+const isClipImage = (p) => clips.some((c) => c.image === p) && fs.existsSync(p)
 ipcMain.handle('clips:get', () => clips)
 ipcMain.on('clips:copy', (_e, text) => clipboard.writeText(text))
-ipcMain.on('clips:clear', () => { clips = []; win.webContents.send('clips', clips) })
+ipcMain.on('clips:copyImage', (_e, p) => { if (isClipImage(p)) clipboard.write([new ClipboardItem({ 'image/png': new Blob([fs.readFileSync(p)], { type: 'image/png' }) })]).catch(() => {}) })
+ipcMain.on('clips:open', (_e, p) => { if (isClipImage(p)) shell.openPath(p) })
+ipcMain.on('clips:drag', (e, p) => { if (isClipImage(p)) e.sender.startDrag({ file: p, icon: nativeImage.createFromPath(p).resize({ width: 96 }) }) })
+ipcMain.on('clips:clear', () => { for (const c of clips) if (c.image) fs.rmSync(c.image, { force: true }); clips = []; win.webContents.send('clips', clips) })
 
 // ---------- file tray ----------
 const trayFile = () => path.join(app.getPath('userData'), 'tray.json')
@@ -344,6 +412,7 @@ function startMedia() {
         else if (m.type === 'night') { media.night = m.on; media.nightStrength = m.strength ?? null }
         else if (m.type === 'art') media.art = { mime: m.mime, data: m.data }
         else if (m.type === 'gpu') { sysStats.gpu = m.gpu; continue }
+        else if (m.type === 'clipseq') { clipChanged = true; continue }
         else if (m.type === 'windrag' || m.type === 'snip') { stepAside(m.type, m.on); continue }
         else { if (!m.active) media.art = null; media.state = { ...m, at: Date.now() } }
         pushMedia()

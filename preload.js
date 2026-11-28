@@ -10,7 +10,8 @@ document.addEventListener('drop', (e) => {
   e.preventDefault()
   const paths = [...(e.dataTransfer?.files ?? [])].map((f) => webUtils.getPathForFile(f)).filter(Boolean)
   // dropped on the Convert page: those files are to convert; anywhere else they go to the file tray
-  if (paths.length) ipcRenderer.send(e.target instanceof Element && e.target.closest('[data-drop="convert"]') ? 'convert:add' : 'tray:add', paths)
+  const zone = e.target instanceof Element ? e.target.closest('[data-drop]')?.getAttribute('data-drop') : null
+  if (paths.length) ipcRenderer.send(zone === 'convert' ? 'convert:add' : zone === 'phone' ? 'phone:send' : 'tray:add', paths)
 })
 
 contextBridge.exposeInMainWorld('kitty', {
@@ -18,6 +19,7 @@ contextBridge.exposeInMainWorld('kitty', {
   rect: send('rect'), track: send('track'), onCursor: on('cursor'), idle: call('idle'),
   // clipboard + tray
   clips: call('clips:get'), copyClip: send('clips:copy'), clearClips: send('clips:clear'), onClips: on('clips'),
+  copyClipImage: send('clips:copyImage'), openClip: send('clips:open'), dragClip: send('clips:drag'), onClipImage: on('clip:image'),
   tray: call('tray:get'), onTray: on('tray'), removeFile: send('tray:remove'), openFile: send('tray:open'), dragFile: send('tray:drag'),
   // media, volume, airplane mode, mic/camera
   media: call('media:get'), onMedia: on('media'), mediaCmd: send('media:cmd'),
@@ -35,6 +37,11 @@ contextBridge.exposeInMainWorld('kitty', {
   updateStatus: call('update:get'), onUpdate: on('update'), checkUpdate: send('update:check'), installUpdate: send('update:install'),
   info: call('info:get'), onInfo: on('info'), openUrl: send('open:url'),
   canPanels: call('panel:can'), openPanel: send('panel:open'),
+  // Download
+  dl: call('dl:get'), onDl: on('dl'), dlSite: call('dl:site'), dlSetup: send('dl:setup'), dlStart: (url, kind) => ipcRenderer.send('dl:start', { url, kind }),
+  dlCancel: send('dl:cancel'), dlClear: send('dl:clear'), dlOpen: send('dl:open'), dlReveal: send('dl:reveal'), clipText: call('clips:text'),
+  // Send to phone
+  phoneDevices: call('phone:devices'), phoneSend: send('phone:send'), onPhoneStatus: on('phone:status'),
   // Convert
   convert: call('convert:get'), onConvert: on('convert'), convertPick: call('convert:pick'), convertAdd: send('convert:add'), convertRemove: send('convert:remove'),
   convertClear: send('convert:clear'), convertSet: send('convert:set'), convertRun: send('convert:run'), convertOpen: send('convert:open'), convertReveal: send('convert:reveal'),

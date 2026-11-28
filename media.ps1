@@ -19,6 +19,7 @@ public static class WinDrag {
   [StructLayout(LayoutKind.Sequential)] struct RECT { public int L, T, R, B; }
   [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
   [DllImport("user32.dll")] static extern int GetSystemMetrics(int i);
+  [DllImport("user32.dll")] static extern uint GetClipboardSequenceNumber(); // goes up on every copy, costs nothing to ask
   static readonly string[] Snippers = { "screenclippinghost", "snippingtool", "screensketch", "sharex", "greenshot", "lightshot", "snagit32", "snagitcapture", "snagiteditor", "picpick" };
   // a known screenshot tool, with a window covering the whole screen (its selection overlay, not its normal window)
   static bool IsSnipOverlay(IntPtr h) {
@@ -32,7 +33,7 @@ public static class WinDrag {
   }
   public static void Start() {
     var t = new Thread(() => {
-      bool down = false, drag = false, snip = false; IntPtr w = IntPtr.Zero, lastFg = IntPtr.Zero; RECT r0 = new RECT(); int tick = 0;
+      bool down = false, drag = false, snip = false; IntPtr w = IntPtr.Zero, lastFg = IntPtr.Zero; RECT r0 = new RECT(); int tick = 0, n = 0; uint seq = GetClipboardSequenceNumber();
       while (true) {
         bool now = (GetAsyncKeyState(1) & 0x8000) != 0;
         IntPtr fg = GetForegroundWindow();
@@ -53,6 +54,8 @@ public static class WinDrag {
           }
         } else if (!now && drag) { drag = false; Console.Out.WriteLine("{\"type\":\"windrag\",\"on\":false}"); Console.Out.Flush(); }
         down = now;
+        // something new was copied: Kitty looks whether it is an image (a screenshot) only then
+        if (++n % 5 == 0) { uint s2 = GetClipboardSequenceNumber(); if (s2 != seq) { seq = s2; Console.Out.WriteLine("{\"type\":\"clipseq\"}"); Console.Out.Flush(); } }
         Thread.Sleep(40);
       }
     });

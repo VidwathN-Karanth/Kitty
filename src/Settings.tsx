@@ -1,7 +1,7 @@
 import { ReactNode, useEffect, useMemo, useState } from 'react'
 import {
   Home, Plug, MessageCircle, LayoutGrid, SlidersHorizontal, Cat as CatIcon, Shirt, Newspaper, Lock, Check, Search, Sun, Moon, Music, Timer,
-  Inbox, Copy, FileText, Clock, Settings as Gear, Sparkles, Bot, ChevronRight, Play, Globe, ArrowLeftRight,
+  Inbox, Copy, FileText, Clock, Settings as Gear, Sparkles, Bot, ChevronRight, Play, Globe, ArrowLeftRight, Download,
 } from 'lucide-react'
 import { TABS } from './tabs'
 import Cat, { EMOTIONS, Mood } from './Cat'
@@ -57,6 +57,7 @@ const APPS: { id: keyof Settings['apps']; title: string; desc: string; icon: typ
   { id: 'system', title: 'Control Center', desc: 'Brightness, volume, Wi-Fi (join networks), Bluetooth, mute and power mode.', icon: SlidersHorizontal, tone: '#7fb8ff' },
   { id: 'links', title: 'Quick Links', desc: 'Your favourite sites with their logos, one click away.', icon: Globe, tone: '#ff8a7a' },
   { id: 'convert', title: 'Convert', desc: 'Images to any image format or a PDF, PDF to Word, Word to PDF.', icon: ArrowLeftRight, tone: '#4fd1c5' },
+  { id: 'download', title: 'Download', desc: 'A YouTube or Instagram link to a video (with sound) or an MP3.', icon: Download, tone: '#ff5c7a' },
   { id: 'clock', title: 'Clock', desc: 'The date and time in the island header.', icon: Clock, tone: '#8a7eff' },
 ]
 

@@ -21,12 +21,16 @@ type Settings = {
   stats: { cpu: boolean; ram: boolean; gpu: boolean }; statsRest: boolean; statsOpen: boolean; peekOnQuestion: boolean
   startTab: string // the page the island opens on: a tab id, or 'last' for wherever it was
   shortcuts: Record<ShortcutKey, string>
-  apps: { claude: boolean; music: boolean; chat: boolean; focus: boolean; tray: boolean; clipboard: boolean; note: boolean; clock: boolean; system: boolean; links: boolean; convert: boolean }
+  apps: { claude: boolean; music: boolean; chat: boolean; focus: boolean; tray: boolean; clipboard: boolean; note: boolean; clock: boolean; system: boolean; links: boolean; convert: boolean; download: boolean }
 }
 type SettingsPatch = Partial<Omit<Settings, 'apps' | 'shortcuts' | 'stats'>> & { apps?: Partial<Settings['apps']>; shortcuts?: Partial<Settings['shortcuts']>; stats?: Partial<Settings['stats']> }
 type ConvertFile = { path: string; name: string; size: number; format: string | null }
 type ConvertResult = { status: 'waiting' | 'working' | 'done' | 'error' | 'skip'; out?: string; error?: string }
 type ConvertState = { files: ConvertFile[]; from: string; to: string | null; combine: boolean; running: boolean; results: Record<string, ConvertResult>; toOptions: string[]; detected: string | null; mixed: boolean }
+type DlJob = { id: string; url: string; site: 'youtube' | 'instagram'; kind: 'video' | 'audio'; status: 'working' | 'done' | 'error' | 'cancelled'; pct: number; speed: string; eta: string; title: string; out?: string; error?: string }
+type DlState = { tools: { ytdlp: boolean; ffmpeg: boolean }; size: { ytdlp: number; ffmpeg: number }; setup: null | { step: 'yt-dlp' | 'ffmpeg' | 'unpacking' | 'error'; pct?: number; error?: string }; jobs: DlJob[] }
+type PhoneStatus = { state: 'sending' | 'done'; count?: number; ok?: boolean; device?: string; sent?: number; error?: string }
+type Clip = { t: number; text?: string; image?: string; thumb?: string; w?: number; h?: number }
 type SysStats = { cpu: number | null; ram: number | null; ramUsed: number; ramTotal: number; gpu: number | null }
 
 interface Window {
@@ -37,10 +41,10 @@ interface Window {
     track(on: boolean): void
     onCursor(cb: (p: { x: number; y: number }) => void): () => void
     idle(): Promise<number>
-    clips(): Promise<{ text: string; t: number }[]>
+    clips(): Promise<Clip[]>
     copyClip(text: string): void
     clearClips(): void
-    onClips(cb: (c: { text: string; t: number }[]) => void): () => void
+    onClips(cb: (c: Clip[]) => void): () => void
     tray(): Promise<TrayFile[]>
     onTray(cb: (f: TrayFile[]) => void): () => void
     removeFile(path: string): void
@@ -79,6 +83,23 @@ interface Window {
     wifiJoin(ssid: string, password: string | null, secure: boolean): Promise<{ ok?: boolean; needPassword?: boolean; error?: string }>
     canPanels(): Promise<boolean>
     openPanel(name: 'display' | 'sound' | 'bluetooth' | 'nightlight'): void
+    dl(): Promise<DlState>
+    onDl(cb: (s: DlState) => void): () => void
+    dlSite(url: string): Promise<'youtube' | 'instagram' | null>
+    dlSetup(): void
+    dlStart(url: string, kind: 'video' | 'audio'): void
+    dlCancel(id: string): void
+    dlClear(): void
+    dlOpen(path: string): void
+    dlReveal(path: string): void
+    clipText(): Promise<string>
+    phoneDevices(): Promise<{ id: string; name: string }[] | null>
+    phoneSend(paths: string[]): void
+    onPhoneStatus(cb: (s: PhoneStatus) => void): () => void
+    copyClipImage(path: string): void
+    openClip(path: string): void
+    dragClip(path: string): void
+    onClipImage(cb: (c: Clip) => void): () => void
     convert(): Promise<ConvertState>
     onConvert(cb: (s: ConvertState) => void): () => void
     convertPick(): Promise<void>

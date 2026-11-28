@@ -21,6 +21,7 @@ import Clipboard from './Clipboard'
 import Controls from './Controls'
 import Links from './Links'
 import Convert from './Convert'
+import Download from './Download'
 import Focus, { FocusState } from './Focus'
 import { wearing } from './catStyle'
 import { useClaude, lightState } from './useClaude'
@@ -162,10 +163,12 @@ export default function App() {
     window.kitty.onToggle(() => { openFresh(); setOpen((o) => !o) })
     window.kitty.onFold(() => { hovered.current = false; setOpen(false); setMenu(false); setVolPop(false) }) // a window is being dragged
     const offGoto = window.kitty.onGoto((id) => { setTab(id as TabId); peek(6000) }) // global shortcuts jump straight to a tab
+    // a picture was copied (a screenshot): the island opens on it, ready to drag anywhere or send to the phone
+    const offClipImage = window.kitty.onClipImage(() => { if (cfg.current.apps.clipboard && !openRef.current) { setTab('clipboard'); peek(7000) } })
     window.kitty.usage().then(setUsed)
     const offUsage = window.kitty.onUsage(setUsed)
     if (cfg.current.startupAnim) flash('hi', 2800)
-    return () => { clearInterval(t); offGoto(); offUsage() }
+    return () => { clearInterval(t); offGoto(); offUsage(); offClipImage() }
   }, [])
 
   // Focus timer finished: notify and reset. State lives here so it keeps running on other tabs.
@@ -503,6 +506,7 @@ export default function App() {
                       : tab === 'system' ? <Controls media={media} />
                       : tab === 'links' ? <Links />
                       : tab === 'convert' ? <Convert />
+                      : tab === 'download' ? <Download />
                       : <Chat name={settings.name} follow={settings.follow} look={look} mood={mood} setMood={(x) => showMood(x, 6000)} blink={settings.blinking} />}
                   </motion.div>
                 </AnimatePresence>
